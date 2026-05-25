@@ -24,19 +24,20 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center auth-gradient-bg px-4 py-12">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-sky-500 text-primary-foreground font-bold text-lg shadow-lg shadow-primary/20">
             CF
           </div>
+          <p className="page-kicker">Account help</p>
           <h1 className="text-2xl font-bold tracking-tight">Reset password</h1>
           <p className="text-muted-foreground">
             We&apos;ll send you a link to reset your password
           </p>
         </div>
 
-        <Card>
+        <Card className="shadow-xl shadow-primary/10">
           {isSubmitted ? (
             <>
               <CardHeader className="space-y-1 pb-4">

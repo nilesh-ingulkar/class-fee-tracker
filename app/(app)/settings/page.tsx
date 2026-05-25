@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,37 +37,50 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { User, Bell, Globe, Shield, LogOut, Coins, Plus, Trash2, Palette, Sun, Moon, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface Currency {
-  code: string;
-  name: string;
-  symbol: string;
-  enabled: boolean;
-}
+import { useAuth } from "@/hooks/use-auth";
+import { useAppData } from "@/hooks/use-app-data";
+import { getInitials, getUserDisplayName } from "@/lib/user-display";
 
 const themes = [
-  { value: "light", label: "Light", icon: Sun, description: "Clean and bright" },
+  { value: "light", label: "Blue", icon: Sun, description: "Soft and bright" },
   { value: "dark", label: "Dark", icon: Moon, description: "Easy on the eyes" },
   { value: "blue", label: "Professional", icon: Monitor, description: "Blue SaaS theme" },
 ] as const;
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { user, isSigningOut, signOut } = useAuth();
+  const {
+    data,
+    error,
+    addCurrency,
+    setCurrencyActive,
+  } = useAppData();
   const [isSaving, setIsSaving] = useState(false);
-  const [name, setName] = useState("John Doe");
-  const [email, setEmail] = useState("john@example.com");
+  const [name, setName] = useState(getUserDisplayName(user));
+  const [email, setEmail] = useState(user?.email ?? "");
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [reminderNotifications, setReminderNotifications] = useState(true);
-  
-  const [currencies, setCurrencies] = useState<Currency[]>([
-    { code: "USD", name: "US Dollar", symbol: "$", enabled: true },
-    { code: "INR", name: "Indian Rupee", symbol: "₹", enabled: true },
-  ]);
+  const [isThemeMounted, setIsThemeMounted] = useState(false);
+
   const [isAddCurrencyOpen, setIsAddCurrencyOpen] = useState(false);
+  const [isAddingCurrency, setIsAddingCurrency] = useState(false);
   const [newCurrencyCode, setNewCurrencyCode] = useState("");
   const [newCurrencyName, setNewCurrencyName] = useState("");
   const [newCurrencySymbol, setNewCurrencySymbol] = useState("");
+
+  const currencies = data.currencies;
+  const enabledCurrencies = currencies.filter((currency) => currency.isActive);
+
+  useEffect(() => {
+    setName(getUserDisplayName(user));
+    setEmail(user?.email ?? "");
+  }, [user]);
+
+  useEffect(() => {
+    setIsThemeMounted(true);
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -74,18 +88,28 @@ export default function SettingsPage() {
     setIsSaving(false);
   };
 
-  const handleAddCurrency = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (
+      enabledCurrencies.length > 0 &&
+      !enabledCurrencies.some((currency) => currency.code === defaultCurrency)
+    ) {
+      setDefaultCurrency(enabledCurrencies[0].code);
+    }
+  }, [defaultCurrency, enabledCurrencies]);
+
+  const handleAddCurrency = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newCurrencyCode && newCurrencyName && newCurrencySymbol) {
-      setCurrencies([
-        ...currencies,
-        {
-          code: newCurrencyCode.toUpperCase(),
-          name: newCurrencyName,
-          symbol: newCurrencySymbol,
-          enabled: true,
-        },
-      ]);
+      setIsAddingCurrency(true);
+      const created = await addCurrency({
+        code: newCurrencyCode,
+        name: newCurrencyName,
+        symbol: newCurrencySymbol,
+      });
+      setIsAddingCurrency(false);
+
+      if (!created) return;
+
       setNewCurrencyCode("");
       setNewCurrencyName("");
       setNewCurrencySymbol("");
@@ -94,23 +118,21 @@ export default function SettingsPage() {
   };
 
   const handleToggleCurrency = (code: string) => {
-    setCurrencies(
-      currencies.map((c) =>
-        c.code === code ? { ...c, enabled: !c.enabled } : c
-      )
-    );
+    const currency = currencies.find((item) => item.code === code);
+    if (!currency) return;
+
+    void setCurrencyActive(code, !currency.isActive);
   };
 
   const handleRemoveCurrency = (code: string) => {
-    if (currencies.length <= 1 || code === defaultCurrency) return;
-    setCurrencies(currencies.filter((c) => c.code !== code));
+    if (enabledCurrencies.length <= 1 || code === defaultCurrency) return;
+    void setCurrencyActive(code, false);
   };
-
-  const enabledCurrencies = currencies.filter((c) => c.enabled);
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div>
+      <div className="blue-panel p-4 sm:p-6">
+        <p className="page-kicker">Workspace</p>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Settings
         </h1>
@@ -123,7 +145,9 @@ export default function SettingsPage() {
       <Card>
         <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
           <CardTitle className="text-sm font-semibold flex items-center gap-2 sm:text-base">
-            <Palette className="h-4 w-4 shrink-0" />
+            <span className="blue-icon h-8 w-8">
+              <Palette className="h-4 w-4 shrink-0" />
+            </span>
             Appearance
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">
@@ -138,18 +162,22 @@ export default function SettingsPage() {
                 onClick={() => setTheme(t.value)}
                 className={cn(
                   "flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all sm:gap-2 sm:p-4",
-                  theme === t.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-muted-foreground/50"
+                  isThemeMounted && theme === t.value
+                    ? "border-primary bg-primary/10 shadow-sm shadow-primary/10"
+                    : "border-border bg-background/70 hover:border-primary/40 hover:bg-accent/40"
                 )}
               >
                 <t.icon className={cn(
                   "h-5 w-5 sm:h-6 sm:w-6",
-                  theme === t.value ? "text-primary" : "text-muted-foreground"
+                  isThemeMounted && theme === t.value
+                    ? "text-primary"
+                    : "text-muted-foreground"
                 )} />
                 <span className={cn(
                   "text-xs font-medium sm:text-sm",
-                  theme === t.value ? "text-primary" : "text-foreground"
+                  isThemeMounted && theme === t.value
+                    ? "text-primary"
+                    : "text-foreground"
                 )}>
                   {t.label}
                 </span>
@@ -163,7 +191,9 @@ export default function SettingsPage() {
       <Card>
         <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
           <CardTitle className="text-sm font-semibold flex items-center gap-2 sm:text-base">
-            <User className="h-4 w-4 shrink-0" />
+            <span className="sky-icon h-8 w-8">
+              <User className="h-4 w-4 shrink-0" />
+            </span>
             Profile
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">
@@ -172,8 +202,8 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="px-4 pb-4 space-y-4 sm:px-6 sm:pb-6">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-semibold text-primary shrink-0 sm:h-14 sm:w-14 sm:text-xl">
-              JD
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-200 to-sky-500 flex items-center justify-center text-lg font-semibold text-blue-950 shrink-0 shadow-md shadow-primary/10 sm:h-14 sm:w-14 sm:text-xl">
+              {getInitials(name || email)}
             </div>
             <Button variant="outline" size="sm">
               Change photo
@@ -208,7 +238,9 @@ export default function SettingsPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <CardTitle className="text-sm font-semibold flex items-center gap-2 sm:text-base">
-                <Coins className="h-4 w-4 shrink-0" />
+                <span className="cyan-icon h-8 w-8">
+                  <Coins className="h-4 w-4 shrink-0" />
+                </span>
                 Currencies
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm">
@@ -231,6 +263,13 @@ export default function SettingsPage() {
                 </DialogHeader>
                 <form onSubmit={handleAddCurrency}>
                   <div className="space-y-4 py-4">
+                    {error ? (
+                      <Alert variant="destructive">
+                        <AlertTitle>Could not add currency</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    ) : null}
+
                     <div className="space-y-2">
                       <Label htmlFor="currencyCode">Currency Code</Label>
                       <Input
@@ -240,6 +279,7 @@ export default function SettingsPage() {
                         onChange={(e) => setNewCurrencyCode(e.target.value)}
                         maxLength={3}
                         required
+                        disabled={isAddingCurrency}
                       />
                       <p className="text-xs text-muted-foreground">
                         3-letter ISO code (e.g., EUR, GBP, JPY)
@@ -253,6 +293,7 @@ export default function SettingsPage() {
                         value={newCurrencyName}
                         onChange={(e) => setNewCurrencyName(e.target.value)}
                         required
+                        disabled={isAddingCurrency}
                       />
                     </div>
                     <div className="space-y-2">
@@ -264,6 +305,7 @@ export default function SettingsPage() {
                         onChange={(e) => setNewCurrencySymbol(e.target.value)}
                         maxLength={3}
                         required
+                        disabled={isAddingCurrency}
                       />
                     </div>
                   </div>
@@ -272,10 +314,20 @@ export default function SettingsPage() {
                       type="button"
                       variant="outline"
                       onClick={() => setIsAddCurrencyOpen(false)}
+                      disabled={isAddingCurrency}
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Add Currency</Button>
+                    <Button type="submit" disabled={isAddingCurrency}>
+                      {isAddingCurrency ? (
+                        <>
+                          <Spinner className="mr-2" />
+                          Adding...
+                        </>
+                      ) : (
+                        "Add Currency"
+                      )}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -293,8 +345,8 @@ export default function SettingsPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{currency.code}</span>
-                    <Badge variant={currency.enabled ? "default" : "secondary"} className="text-xs">
-                      {currency.enabled ? "Active" : "Off"}
+                    <Badge variant={currency.isActive ? "default" : "secondary"} className="text-xs">
+                      {currency.isActive ? "Active" : "Off"}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground truncate">
@@ -303,16 +355,16 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Switch
-                    checked={currency.enabled}
+                    checked={currency.isActive}
                     onCheckedChange={() => handleToggleCurrency(currency.code)}
-                    disabled={enabledCurrencies.length === 1 && currency.enabled}
+                    disabled={enabledCurrencies.length === 1 && currency.isActive}
                   />
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     onClick={() => handleRemoveCurrency(currency.code)}
-                    disabled={currencies.length === 1 || currency.code === defaultCurrency}
+                    disabled={enabledCurrencies.length === 1 || currency.code === defaultCurrency}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -340,23 +392,23 @@ export default function SettingsPage() {
                     <TableCell>{currency.name}</TableCell>
                     <TableCell>{currency.symbol}</TableCell>
                     <TableCell>
-                      <Badge variant={currency.enabled ? "default" : "secondary"}>
-                        {currency.enabled ? "Active" : "Disabled"}
+                      <Badge variant={currency.isActive ? "default" : "secondary"}>
+                        {currency.isActive ? "Active" : "Disabled"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Switch
-                          checked={currency.enabled}
+                          checked={currency.isActive}
                           onCheckedChange={() => handleToggleCurrency(currency.code)}
-                          disabled={enabledCurrencies.length === 1 && currency.enabled}
+                          disabled={enabledCurrencies.length === 1 && currency.isActive}
                         />
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={() => handleRemoveCurrency(currency.code)}
-                          disabled={currencies.length === 1 || currency.code === defaultCurrency}
+                          disabled={enabledCurrencies.length === 1 || currency.code === defaultCurrency}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -474,9 +526,17 @@ export default function SettingsPage() {
 
       {/* Actions */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-        <Button variant="outline" className="text-destructive hover:text-destructive">
+        <Button
+          type="button"
+          variant="outline"
+          className="text-destructive hover:text-destructive"
+          onClick={() => {
+            void signOut();
+          }}
+          disabled={isSigningOut}
+        >
           <LogOut className="h-4 w-4 mr-2" />
-          Sign out
+          {isSigningOut ? "Signing out..." : "Sign out"}
         </Button>
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
