@@ -32,10 +32,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Empty } from "@/components/ui/empty";
-import { getClassWithDetails } from "@/lib/mock-data";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { getClassWithDetails } from "@/lib/app-data";
 import { formatCurrency, getCurrencySymbol } from "@/lib/types";
 import type { SessionStatus } from "@/lib/types";
+import { useAppData } from "@/hooks/use-app-data";
 import {
   ArrowLeft,
   User,
@@ -47,6 +55,8 @@ import {
   CheckCircle,
   XCircle,
   CreditCard,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 function getStatusBadge(status: SessionStatus) {
@@ -83,9 +93,40 @@ export default function ClassDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const classData = getClassWithDetails(id);
+  const {
+    data,
+    isReady,
+    addPayment,
+    addSession,
+    updatePayment,
+    updateSession,
+    deleteSession,
+    deletePayment,
+  } = useAppData();
+  const classData = getClassWithDetails(data, id);
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [sessionDate, setSessionDate] = useState("");
+  const [sessionStartTime, setSessionStartTime] = useState("");
+  const [sessionStatus, setSessionStatus] =
+    useState<SessionStatus>("scheduled");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [paymentNotes, setPaymentNotes] = useState("");
+
+  if (!isReady) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+          Loading class...
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!classData) {
     notFound();
@@ -99,6 +140,78 @@ export default function ClassDetailPage({
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
+  const handleAddSession = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!sessionDate || !sessionStartTime) {
+      return;
+    }
+
+    const saved = editingSessionId
+      ? await updateSession({
+          id: editingSessionId,
+          date: new Date(`${sessionDate}T00:00:00`),
+          startTime: sessionStartTime,
+          status: sessionStatus,
+        })
+      : await addSession({
+          classId: classData.id,
+          date: new Date(`${sessionDate}T00:00:00`),
+          startTime: sessionStartTime,
+          status: sessionStatus,
+        });
+
+    if (!saved) return;
+
+    setEditingSessionId(null);
+    setSessionDate("");
+    setSessionStartTime("");
+    setSessionStatus("scheduled");
+    setIsAddSessionOpen(false);
+  };
+
+  const handleAddPayment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const amount = Number(paymentAmount);
+
+    if (!paymentDate || Number.isNaN(amount)) {
+      return;
+    }
+
+    const saved = editingPaymentId
+      ? await updatePayment({
+          id: editingPaymentId,
+          amount,
+          date: new Date(`${paymentDate}T00:00:00`),
+          notes: paymentNotes,
+        })
+      : await addPayment({
+          classId: classData.id,
+          amount,
+          currency: classData.currency,
+          date: new Date(`${paymentDate}T00:00:00`),
+          notes: paymentNotes,
+        });
+
+    if (!saved) return;
+
+    setEditingPaymentId(null);
+    setPaymentAmount("");
+    setPaymentDate(new Date().toISOString().split("T")[0]);
+    setPaymentNotes("");
+    setIsAddPaymentOpen(false);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!window.confirm("Delete this session? This cannot be undone.")) return;
+    await deleteSession(sessionId);
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!window.confirm("Delete this payment? This cannot be undone.")) return;
+    await deletePayment(paymentId);
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Back button */}
@@ -111,7 +224,8 @@ export default function ClassDetailPage({
       </Link>
 
       {/* Class Header */}
-      <div>
+      <div className="blue-panel p-4 sm:p-6">
+        <p className="page-kicker">Class details</p>
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl truncate">
             {classData.name}
@@ -194,7 +308,18 @@ export default function ClassDetailPage({
             <Calendar className="h-4 w-4 shrink-0" />
             Sessions
           </CardTitle>
-          <Dialog open={isAddSessionOpen} onOpenChange={setIsAddSessionOpen}>
+          <Dialog
+            open={isAddSessionOpen}
+            onOpenChange={(open) => {
+              setIsAddSessionOpen(open);
+              if (!open) {
+                setEditingSessionId(null);
+                setSessionDate("");
+                setSessionStartTime("");
+                setSessionStatus("scheduled");
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">
                 <Plus className="h-4 w-4 sm:mr-1" />
@@ -203,35 +328,45 @@ export default function ClassDetailPage({
             </DialogTrigger>
             <DialogContent className="mx-4 max-w-[calc(100vw-2rem)] sm:mx-auto sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Add a new session</DialogTitle>
+                <DialogTitle>
+                  {editingSessionId ? "Edit session" : "Add a new session"}
+                </DialogTitle>
                 <DialogDescription>
                   Schedule a new session for this class.
                 </DialogDescription>
               </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setIsAddSessionOpen(false);
-                }}
-              >
+              <form onSubmit={handleAddSession}>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="sessionDate">Date</Label>
-                    <Input id="sessionDate" type="date" required />
+                    <Input
+                      id="sessionDate"
+                      type="date"
+                      value={sessionDate}
+                      onChange={(event) => setSessionDate(event.target.value)}
+                      required
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="startTime">Start</Label>
-                      <Input id="startTime" type="time" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="endTime">End</Label>
-                      <Input id="endTime" type="time" required />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="startTime">Time</Label>
+                    <Input
+                      id="startTime"
+                      type="time"
+                      value={sessionStartTime}
+                      onChange={(event) =>
+                        setSessionStartTime(event.target.value)
+                      }
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
-                    <Select defaultValue="scheduled">
+                    <Select
+                      value={sessionStatus}
+                      onValueChange={(value) =>
+                        setSessionStatus(value as SessionStatus)
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -247,11 +382,16 @@ export default function ClassDetailPage({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsAddSessionOpen(false)}
+                    onClick={() => {
+                      setEditingSessionId(null);
+                      setIsAddSessionOpen(false);
+                    }}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Add Session</Button>
+                  <Button type="submit">
+                    {editingSessionId ? "Save Session" : "Add Session"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -259,11 +399,19 @@ export default function ClassDetailPage({
         </CardHeader>
         <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
           {sortedSessions.length === 0 ? (
-            <Empty
-              icon={Calendar}
-              title="No sessions yet"
-              description="Add your first session to start tracking attendance."
-            />
+            <Empty>
+              <EmptyContent>
+                <EmptyMedia variant="icon">
+                  <Calendar className="h-6 w-6" />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>No sessions yet</EmptyTitle>
+                  <EmptyDescription>
+                    Add your first session to start tracking attendance.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </EmptyContent>
+            </Empty>
           ) : (
             <>
               {/* Mobile: Card Layout */}
@@ -283,10 +431,39 @@ export default function ClassDetailPage({
                           })}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {session.startTime} - {session.endTime}
+                          {session.startTime || "No time set"}
                         </p>
                       </div>
-                      {getStatusBadge(session.status)}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(session.status)}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingSessionId(session.id);
+                            setSessionDate(
+                              new Date(session.date).toISOString().split("T")[0],
+                            );
+                            setSessionStartTime(session.startTime);
+                            setSessionStatus(session.status);
+                            setIsAddSessionOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            void handleDeleteSession(session.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     {session.notes && (
                       <p className="text-xs text-muted-foreground truncate">
@@ -305,7 +482,7 @@ export default function ClassDetailPage({
                       <TableHead>Date</TableHead>
                       <TableHead>Time</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Notes</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -320,11 +497,41 @@ export default function ClassDetailPage({
                           })}
                         </TableCell>
                         <TableCell>
-                          {session.startTime} - {session.endTime}
+                          {session.startTime || "No time set"}
                         </TableCell>
                         <TableCell>{getStatusBadge(session.status)}</TableCell>
-                        <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                          {session.notes || "-"}
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingSessionId(session.id);
+                                setSessionDate(
+                                  new Date(session.date).toISOString().split("T")[0],
+                                );
+                                setSessionStartTime(session.startTime);
+                                setSessionStatus(session.status);
+                                setIsAddSessionOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                void handleDeleteSession(session.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -343,7 +550,18 @@ export default function ClassDetailPage({
             <CreditCard className="h-4 w-4 shrink-0" />
             Payments
           </CardTitle>
-          <Dialog open={isAddPaymentOpen} onOpenChange={setIsAddPaymentOpen}>
+          <Dialog
+            open={isAddPaymentOpen}
+            onOpenChange={(open) => {
+              setIsAddPaymentOpen(open);
+              if (!open) {
+                setEditingPaymentId(null);
+                setPaymentAmount("");
+                setPaymentDate(new Date().toISOString().split("T")[0]);
+                setPaymentNotes("");
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">
                 <Plus className="h-4 w-4 sm:mr-1" />
@@ -352,17 +570,14 @@ export default function ClassDetailPage({
             </DialogTrigger>
             <DialogContent className="mx-4 max-w-[calc(100vw-2rem)] sm:mx-auto sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Record a payment</DialogTitle>
+                <DialogTitle>
+                  {editingPaymentId ? "Edit payment" : "Record a payment"}
+                </DialogTitle>
                 <DialogDescription>
                   Add a payment record for this class.
                 </DialogDescription>
               </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setIsAddPaymentOpen(false);
-                }}
-              >
+              <form onSubmit={handleAddPayment}>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="amount">
@@ -372,6 +587,8 @@ export default function ClassDetailPage({
                       id="amount"
                       type="number"
                       placeholder="0.00"
+                      value={paymentAmount}
+                      onChange={(event) => setPaymentAmount(event.target.value)}
                       required
                       min="0"
                       step="0.01"
@@ -379,22 +596,38 @@ export default function ClassDetailPage({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="paymentDate">Date</Label>
-                    <Input id="paymentDate" type="date" required />
+                    <Input
+                      id="paymentDate"
+                      type="date"
+                      value={paymentDate}
+                      onChange={(event) => setPaymentDate(event.target.value)}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="notes">Notes (optional)</Label>
-                    <Input id="notes" placeholder="Payment description" />
+                    <Input
+                      id="notes"
+                      placeholder="Payment description"
+                      value={paymentNotes}
+                      onChange={(event) => setPaymentNotes(event.target.value)}
+                    />
                   </div>
                 </div>
                 <DialogFooter className="gap-2 sm:gap-0">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsAddPaymentOpen(false)}
+                    onClick={() => {
+                      setEditingPaymentId(null);
+                      setIsAddPaymentOpen(false);
+                    }}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Add Payment</Button>
+                  <Button type="submit">
+                    {editingPaymentId ? "Save Payment" : "Add Payment"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -402,11 +635,19 @@ export default function ClassDetailPage({
         </CardHeader>
         <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
           {sortedPayments.length === 0 ? (
-            <Empty
-              icon={CreditCard}
-              title="No payments yet"
-              description="Record your first payment to track fee payments."
-            />
+            <Empty>
+              <EmptyContent>
+                <EmptyMedia variant="icon">
+                  <CreditCard className="h-6 w-6" />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>No payments yet</EmptyTitle>
+                  <EmptyDescription>
+                    Record your first payment to track fee payments.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </EmptyContent>
+            </Empty>
           ) : (
             <>
               {/* Mobile: Card Layout */}
@@ -430,9 +671,38 @@ export default function ClassDetailPage({
                         </p>
                       )}
                     </div>
-                    <span className="text-sm font-semibold text-green-600 shrink-0">
-                      {formatCurrency(payment.amount, payment.currency)}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-semibold text-green-600">
+                        {formatCurrency(payment.amount, payment.currency)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingPaymentId(payment.id);
+                          setPaymentAmount(String(payment.amount));
+                          setPaymentDate(
+                            new Date(payment.date).toISOString().split("T")[0],
+                          );
+                          setPaymentNotes(payment.notes ?? "");
+                          setIsAddPaymentOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          void handleDeletePayment(payment.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -445,6 +715,7 @@ export default function ClassDetailPage({
                       <TableHead>Date</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Notes</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -462,6 +733,39 @@ export default function ClassDetailPage({
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-[200px] truncate">
                           {payment.notes || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingPaymentId(payment.id);
+                                setPaymentAmount(String(payment.amount));
+                                setPaymentDate(
+                                  new Date(payment.date).toISOString().split("T")[0],
+                                );
+                                setPaymentNotes(payment.notes ?? "");
+                                setIsAddPaymentOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                void handleDeletePayment(payment.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -1,4 +1,4 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createBrowserClient } from "@supabase/auth-helpers-nextjs";
 import { getSupabasePublicConfig } from "@/lib/supabase/env";
 import type { SupabaseClient } from "@supabase/supabase-js";
 

@@ -9,7 +9,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'ClassFeeTracker - Manage Class Fees & Payments',
+  title: 'Class Fee Tracker - Manage Class Fees & Payments',
   description: 'A modern SaaS application for parents to manage children, teachers, classes, sessions, and fee payments with multi-currency support.',
   generator: 'v0.app',
   icons: {

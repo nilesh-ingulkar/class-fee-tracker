@@ -10,9 +10,13 @@ import {
 
 export default function VerifyEmailPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center auth-gradient-bg px-4 py-12">
+      <Card className="w-full max-w-md shadow-xl shadow-primary/10">
         <CardHeader className="text-center space-y-2">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-sky-500 text-primary-foreground font-bold text-lg shadow-lg shadow-primary/20">
+            CF
+          </div>
+          <p className="page-kicker">Almost there</p>
           <CardTitle className="text-xl">
             Check your email to verify your account
           </CardTitle>

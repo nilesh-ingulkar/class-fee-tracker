@@ -14,6 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Eye, EyeOff, Check, Mail } from "lucide-react";
+import type { ResendVerificationState } from "@/hooks/use-resend-verification";
 import type { SignUpState } from "@/hooks/use-sign-up";
 
 const VERIFY_COPY = "Check your email to verify your account";
@@ -28,9 +29,11 @@ export type SignUpFormProps = {
   onPasswordChange: (value: string) => void;
   onTogglePassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  onResendVerification: () => void;
   passwordRequirements: { label: string; met: boolean }[];
   allRequirementsMet: boolean;
   state: SignUpState;
+  resendState: ResendVerificationState;
 };
 
 export function SignUpForm({
@@ -43,21 +46,31 @@ export function SignUpForm({
   onPasswordChange,
   onTogglePassword,
   onSubmit,
+  onResendVerification,
   passwordRequirements,
   allRequirementsMet,
   state,
+  resendState,
 }: SignUpFormProps) {
   const isLoading = state.status === "loading";
+  const isResending = resendState.status === "loading";
   const isSuccess = state.status === "success";
   const errorMessage = state.status === "error" ? state.message : null;
+  const canResend =
+    isSuccess || (state.status === "error" && state.reason === "account_exists");
+  const resendMessage =
+    resendState.status === "success" || resendState.status === "error"
+      ? resendState.message
+      : null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center auth-gradient-bg px-4 py-12">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-sky-500 text-primary-foreground font-bold text-lg shadow-lg shadow-primary/20">
             CF
           </div>
+          <p className="page-kicker">CLASS FEE TRACKER</p>
           <h1 className="text-2xl font-bold tracking-tight">
             Create an account
           </h1>
@@ -66,7 +79,7 @@ export function SignUpForm({
           </p>
         </div>
 
-        <Card>
+        <Card className="shadow-xl shadow-primary/10">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl">Sign up</CardTitle>
             <CardDescription>
@@ -84,9 +97,31 @@ export function SignUpForm({
                     <span className="font-medium text-foreground">{email}</span>.
                     After you verify, you can sign in.
                   </p>
-                  <Button asChild variant="outline" className="mt-2 w-full sm:w-auto">
-                    <Link href="/login">Go to sign in</Link>
-                  </Button>
+                  <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+                    <Button asChild variant="outline" className="w-full sm:w-auto">
+                      <Link href="/login">Go to sign in</Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={onResendVerification}
+                      disabled={isResending}
+                    >
+                      {isResending ? "Sending..." : "Resend verification email"}
+                    </Button>
+                  </div>
+                  {resendMessage ? (
+                    <p
+                      className={
+                        resendState.status === "success"
+                          ? "text-xs text-muted-foreground"
+                          : "text-xs text-destructive"
+                      }
+                    >
+                      {resendMessage}
+                    </p>
+                  ) : null}
                 </AlertDescription>
               </Alert>
             ) : (
@@ -94,7 +129,35 @@ export function SignUpForm({
                 {errorMessage ? (
                   <Alert variant="destructive">
                     <AlertTitle>Could not sign up</AlertTitle>
-                    <AlertDescription>{errorMessage}</AlertDescription>
+                    <AlertDescription className="space-y-2">
+                      <p>{errorMessage}</p>
+                      {canResend ? (
+                        <div className="space-y-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={onResendVerification}
+                            disabled={isLoading || isResending}
+                          >
+                            {isResending
+                              ? "Sending..."
+                              : "Resend verification email"}
+                          </Button>
+                          {resendMessage ? (
+                            <p
+                              className={
+                                resendState.status === "success"
+                                  ? "text-xs text-muted-foreground"
+                                  : "text-xs text-destructive"
+                              }
+                            >
+                              {resendMessage}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </AlertDescription>
                   </Alert>
                 ) : null}
 

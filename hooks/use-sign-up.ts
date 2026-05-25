@@ -5,13 +5,17 @@ import { createClient } from "@/lib/supabase/client";
 import {
   signUpWithEmailPassword,
   type SignUpResult,
-} from "@/lib/auth/email-password";
+} from "@/lib/auth";
 
 export type SignUpState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; result: Extract<SignUpResult, { ok: true }> }
-  | { status: "error"; message: string };
+  | {
+      status: "error";
+      reason: Extract<SignUpResult, { ok: false }>["reason"];
+      message: string;
+    };
 
 export function useSignUp() {
   const [state, setState] = useState<SignUpState>({ status: "idle" });
@@ -41,7 +45,11 @@ export function useSignUp() {
           return;
         }
 
-        setState({ status: "error", message: result.message });
+        setState({
+          status: "error",
+          reason: result.reason,
+          message: result.message,
+        });
       } finally {
         inFlightRef.current = false;
       }

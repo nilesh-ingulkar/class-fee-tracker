@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/auth-helpers-nextjs";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabasePublicConfig } from "@/lib/supabase/env";
 
@@ -38,6 +38,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/dashboard" ||
     pathname.startsWith("/children") ||
     pathname.startsWith("/classes") ||
+    pathname.startsWith("/teachers") ||
+    pathname.startsWith("/sessions") ||
     pathname.startsWith("/payments") ||
     pathname.startsWith("/settings");
 

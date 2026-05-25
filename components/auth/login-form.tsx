@@ -14,6 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Eye, EyeOff } from "lucide-react";
+import type { ResendVerificationState } from "@/hooks/use-resend-verification";
 import type { SignInState } from "@/hooks/use-sign-in";
 
 export type LoginFormProps = {
@@ -24,7 +25,9 @@ export type LoginFormProps = {
   onPasswordChange: (value: string) => void;
   onTogglePassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  onResendVerification: () => void;
   state: SignInState;
+  resendState: ResendVerificationState;
   callbackError: string | null;
 };
 
@@ -36,29 +39,37 @@ export function LoginForm({
   onPasswordChange,
   onTogglePassword,
   onSubmit,
+  onResendVerification,
   state,
+  resendState,
   callbackError,
 }: LoginFormProps) {
   const isLoading = state.status === "loading";
+  const isResending = resendState.status === "loading";
   const errorMessage =
     state.status === "error" ? state.message : null;
   const isEmailNotConfirmed =
     state.status === "error" && state.reason === "email_not_confirmed";
+  const resendMessage =
+    resendState.status === "success" || resendState.status === "error"
+      ? resendState.message
+      : null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center auth-gradient-bg px-4 py-12">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-sky-500 text-primary-foreground font-bold text-lg shadow-lg shadow-primary/20">
             CF
           </div>
+          <p className="page-kicker">CLASS FEE TRACKER</p>
           <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
           <p className="text-muted-foreground">
-            Sign in to your ClassFeeTracker account
+            Sign in to your Class Fee Tracker account
           </p>
         </div>
 
-        <Card>
+        <Card className="shadow-xl shadow-primary/10">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl">Sign in</CardTitle>
             <CardDescription>
@@ -82,16 +93,34 @@ export function LoginForm({
                   <AlertDescription className="space-y-2">
                     <p>{errorMessage}</p>
                     {isEmailNotConfirmed ? (
-                      <p className="text-muted-foreground text-xs">
-                        Didn&apos;t get the email?{" "}
-                        <Link
-                          href="/signup"
-                          className="text-primary font-medium underline-offset-4 hover:underline"
+                      <div className="space-y-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={onResendVerification}
+                          disabled={isLoading || isResending}
                         >
-                          Try signing up again
-                        </Link>{" "}
-                        or check your spam folder.
-                      </p>
+                          {isResending
+                            ? "Sending..."
+                            : "Resend verification email"}
+                        </Button>
+                        {resendMessage ? (
+                          <p
+                            className={
+                              resendState.status === "success"
+                                ? "text-xs text-muted-foreground"
+                                : "text-xs text-destructive"
+                            }
+                          >
+                            {resendMessage}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Check your spam folder if it does not arrive.
+                          </p>
+                        )}
+                      </div>
                     ) : null}
                   </AlertDescription>
                 </Alert>

@@ -1,24 +1,30 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import {
-  signInWithEmailPassword,
-  type SignInResult,
+  resendVerificationEmail,
+  type ResendVerificationResult,
 } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 
-export type SignInState =
+export type ResendVerificationState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; result: Extract<SignInResult, { ok: true }> }
+  | {
+      status: "success";
+      message: string;
+      result: Extract<ResendVerificationResult, { ok: true }>;
+    }
   | {
       status: "error";
-      reason: Extract<SignInResult, { ok: false }>["reason"];
+      reason: Extract<ResendVerificationResult, { ok: false }>["reason"];
       message: string;
     };
 
-export function useSignIn() {
-  const [state, setState] = useState<SignInState>({ status: "idle" });
+export function useResendVerification() {
+  const [state, setState] = useState<ResendVerificationState>({
+    status: "idle",
+  });
   const inFlightRef = useRef(false);
 
   const reset = useCallback(() => {
@@ -26,17 +32,21 @@ export function useSignIn() {
   }, []);
 
   const submit = useCallback(
-    async (input: { email: string; password: string }) => {
+    async (input: { email: string; emailRedirectTo: string }) => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setState({ status: "loading" });
 
       try {
         const client = createClient();
-        const result = await signInWithEmailPassword(client, input);
+        const result = await resendVerificationEmail(client, input);
 
         if (result.ok) {
-          setState({ status: "success", result });
+          setState({
+            status: "success",
+            message: result.message ?? "Verification email sent.",
+            result,
+          });
           return;
         }
 

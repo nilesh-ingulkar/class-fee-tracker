@@ -28,6 +28,7 @@ export const mockTeachers: Teacher[] = [
     id: "teacher-1",
     userId: "user-1",
     name: "Sarah Williams",
+    isActive: true,
     email: "sarah@music.com",
     phone: "+1 555-0101",
   },
@@ -35,6 +36,7 @@ export const mockTeachers: Teacher[] = [
     id: "teacher-2",
     userId: "user-1",
     name: "Michael Chen",
+    isActive: true,
     email: "michael@art.com",
     phone: "+1 555-0102",
   },
@@ -42,6 +44,7 @@ export const mockTeachers: Teacher[] = [
     id: "teacher-3",
     userId: "user-1",
     name: "Priya Sharma",
+    isActive: true,
     email: "priya@math.com",
     phone: "+91 98765-43210",
   },
@@ -277,8 +280,8 @@ export function getChildClasses(childId: string): ClassWithDetails[] {
 export function getDashboardStats(): DashboardStats {
   const allClasses = getAllClassesWithDetails();
 
-  const totalOutstanding = { USD: 0, INR: 0 };
-  const totalPaid = { USD: 0, INR: 0 };
+  const totalOutstanding: Record<string, number> = { USD: 0, INR: 0 };
+  const totalPaid: Record<string, number> = { USD: 0, INR: 0 };
 
   allClasses.forEach((c) => {
     if (c.balance > 0) {

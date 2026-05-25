@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * OAuth / email-confirmation redirect target. Exchanges `?code=` for a session
- * and sets auth cookies (via @supabase/ssr).
+ * and sets auth cookies.
  *
  * In Supabase Dashboard → Authentication → URL Configuration, add this origin path:
  * `https://<your-domain>/auth/callback`

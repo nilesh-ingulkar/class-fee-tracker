@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
+import { logout } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthContextValue = {
@@ -58,7 +59,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsSigningOut(true);
     try {
       const client = createClient();
-      await client.auth.signOut();
+      await logout(client);
+      await fetch("/auth/logout", { method: "POST" });
+      setSession(null);
+      setUser(null);
       router.replace("/login");
       router.refresh();
     } finally {

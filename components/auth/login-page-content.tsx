@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/components/auth/auth-provider";
 import { LoginForm } from "@/components/auth/login-form";
+import {
+  getEmailConfirmationRedirectUrl,
+  getSafeRedirectPath,
+} from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
+import { useResendVerification } from "@/hooks/use-resend-verification";
 import { useSignIn } from "@/hooks/use-sign-in";
 
 const CALLBACK_ERROR =
@@ -14,6 +19,8 @@ export function LoginPageContent() {
   const { isAuthenticated } = useAuth();
   const searchParams = useSearchParams();
   const { state, submit } = useSignIn();
+  const { state: resendState, submit: resendVerification } =
+    useResendVerification();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,19 +35,28 @@ export function LoginPageContent() {
   }, [searchParams]);
 
   useEffect(() => {
+    const nextPath = getSafeRedirectPath(searchParams.get("next"));
+
     if (isAuthenticated) {
-      router.replace("/dashboard");
+      router.replace(nextPath);
       return;
     }
     if (state.status === "success") {
-      router.replace("/dashboard");
+      router.replace(nextPath);
     }
-  }, [isAuthenticated, state, router]);
+  }, [isAuthenticated, state, router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCallbackError(null);
     await submit({ email, password });
+  };
+
+  const handleResendVerification = async () => {
+    await resendVerification({
+      email,
+      emailRedirectTo: getEmailConfirmationRedirectUrl(window.location.origin),
+    });
   };
 
   return (
@@ -52,7 +68,9 @@ export function LoginPageContent() {
       onPasswordChange={setPassword}
       onTogglePassword={() => setShowPassword((v) => !v)}
       onSubmit={handleSubmit}
+      onResendVerification={handleResendVerification}
       state={state}
+      resendState={resendState}
       callbackError={callbackError}
     />
   );
