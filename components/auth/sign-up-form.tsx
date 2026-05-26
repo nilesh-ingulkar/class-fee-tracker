@@ -23,10 +23,12 @@ export type SignUpFormProps = {
   name: string;
   email: string;
   password: string;
+  inviteCode: string;
   showPassword: boolean;
   onNameChange: (value: string) => void;
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
+  onInviteCodeChange: (value: string) => void;
   onTogglePassword: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onResendVerification: () => void;
@@ -40,10 +42,12 @@ export function SignUpForm({
   name,
   email,
   password,
+  inviteCode,
   showPassword,
   onNameChange,
   onEmailChange,
   onPasswordChange,
+  onInviteCodeChange,
   onTogglePassword,
   onSubmit,
   onResendVerification,
@@ -57,7 +61,8 @@ export function SignUpForm({
   const isSuccess = state.status === "success";
   const errorMessage = state.status === "error" ? state.message : null;
   const canResend =
-    isSuccess || (state.status === "error" && state.reason === "account_exists");
+    isSuccess ||
+    (state.status === "error" && state.reason === "account_exists");
   const resendMessage =
     resendState.status === "success" || resendState.status === "error"
       ? resendState.message
@@ -83,7 +88,7 @@ export function SignUpForm({
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl">Sign up</CardTitle>
             <CardDescription>
-              Enter your details to create your account
+              Enter your details and family invite code to create your account
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -94,11 +99,15 @@ export function SignUpForm({
                 <AlertDescription className="space-y-2">
                   <p>
                     We sent a confirmation link to{" "}
-                    <span className="font-medium text-foreground">{email}</span>.
-                    After you verify, you can sign in.
+                    <span className="font-medium text-foreground">{email}</span>
+                    . After you verify, you can sign in.
                   </p>
                   <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-                    <Button asChild variant="outline" className="w-full sm:w-auto">
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                    >
                       <Link href="/login">Go to sign in</Link>
                     </Button>
                     <Button
@@ -176,6 +185,24 @@ export function SignUpForm({
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="inviteCode">Invite code</Label>
+                  <Input
+                    id="inviteCode"
+                    type="text"
+                    placeholder="Enter your invite code"
+                    value={inviteCode}
+                    onChange={(e) => onInviteCodeChange(e.target.value)}
+                    required
+                    autoComplete="off"
+                    disabled={isLoading}
+                    spellCheck={false}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Ask admin for the invite code.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -248,7 +275,9 @@ export function SignUpForm({
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading || !allRequirementsMet}
+                  disabled={
+                    isLoading || !allRequirementsMet || !inviteCode.trim()
+                  }
                 >
                   {isLoading ? (
                     <>

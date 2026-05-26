@@ -39,11 +39,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import {
   getAllClassesWithDetails,
   getAllSessionsWithDetails,
   type SessionWithDetails,
 } from "@/lib/app-data";
+import {
+  buildExportFilename,
+  downloadTextFile,
+  rowsToCsv,
+  SESSION_EXPORT_COLUMNS,
+  sessionsToExportRows,
+} from "@/lib/export";
 import type { SessionStatus } from "@/lib/types";
 import { useAppData } from "@/hooks/use-app-data";
 import {
@@ -169,6 +177,22 @@ export default function SessionsPage() {
     await deleteSession(sessionId);
   };
 
+  const childFilterLabel =
+    childFilter === "all"
+      ? undefined
+      : data.children.find((child) => child.id === childFilter)?.name;
+
+  const handleExportSessions = () => {
+    const csv = rowsToCsv(
+      [...SESSION_EXPORT_COLUMNS],
+      sessionsToExportRows(visibleSessions),
+    );
+    downloadTextFile(
+      buildExportFilename("sessions", childFilterLabel),
+      csv,
+    );
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="blue-panel flex items-start justify-between gap-3 p-4 sm:p-6">
@@ -182,19 +206,24 @@ export default function SessionsPage() {
           </p>
         </div>
 
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Session</span>
-            </Button>
-          </DialogTrigger>
+        <div className="flex shrink-0 items-center gap-2">
+          <ExportCsvButton
+            disabled={!isReady || visibleSessions.length === 0}
+            onExport={handleExportSessions}
+          />
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button size="sm" className="shrink-0">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Session</span>
+              </Button>
+            </DialogTrigger>
           <DialogContent className="mx-4 max-w-[calc(100vw-2rem)] sm:mx-auto sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
@@ -284,7 +313,8 @@ export default function SessionsPage() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <Card>

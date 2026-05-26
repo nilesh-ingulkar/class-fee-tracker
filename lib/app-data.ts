@@ -4,10 +4,12 @@ import type {
   ClassWithDetails,
   AppCurrency,
   DashboardStats,
+  FeeRule,
   Payment,
   Session,
   Teacher,
 } from "@/lib/types";
+import { calculateClassBalance } from "@/lib/fee-engine";
 
 export type AppData = {
   children: Child[];
@@ -15,6 +17,7 @@ export type AppData = {
   classes: Class[];
   sessions: Session[];
   payments: Payment[];
+  feeRules: FeeRule[];
   currencies: AppCurrency[];
 };
 
@@ -42,6 +45,7 @@ export const emptyAppData: AppData = {
   classes: [],
   sessions: [],
   payments: [],
+  feeRules: [],
   currencies: [],
 };
 
@@ -61,14 +65,14 @@ export function getClassWithDetails(
 
   const sessions = data.sessions.filter((session) => session.classId === classId);
   const payments = data.payments.filter((payment) => payment.classId === classId);
-  const completedSessions = sessions.filter(
-    (session) => session.status === "completed",
-  );
-  const totalFees =
-    classItem.billingType === "PER_CLASS"
-      ? completedSessions.length * classItem.feeAmount
-      : classItem.feeAmount;
-  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const feeRules = data.feeRules.filter((feeRule) => feeRule.classId === classId);
+  const classBalance = calculateClassBalance({
+    billingType: classItem.billingType,
+    currentFeeAmount: classItem.feeAmount,
+    sessions,
+    payments,
+    feeRules,
+  });
 
   return {
     ...classItem,
@@ -76,9 +80,10 @@ export function getClassWithDetails(
     teacher,
     sessions,
     payments,
-    totalFees,
-    totalPaid,
-    balance: Math.max(totalFees - totalPaid, 0),
+    totalFees: classBalance.totalFees,
+    totalPaid: classBalance.totalPaid,
+    balance: classBalance.balance,
+    creditBalance: classBalance.creditBalance,
   };
 }
 
@@ -96,10 +101,14 @@ export function getChildClasses(data: AppData, childId: string): ClassWithDetail
 
 export function getDashboardStats(data: AppData): DashboardStats {
   const allClasses = getAllClassesWithDetails(data);
-  const totalOutstanding: Record<string, number> = { USD: 0, INR: 0 };
-  const totalPaid: Record<string, number> = { USD: 0, INR: 0 };
+  const totalOutstanding: Record<string, number> = {};
+  const totalPaid: Record<string, number> = {};
 
   allClasses.forEach((classRecord) => {
+    totalOutstanding[classRecord.currency] =
+      totalOutstanding[classRecord.currency] ?? 0;
+    totalPaid[classRecord.currency] = totalPaid[classRecord.currency] ?? 0;
+
     if (classRecord.balance > 0) {
       totalOutstanding[classRecord.currency] += classRecord.balance;
     }

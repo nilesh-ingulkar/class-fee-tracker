@@ -57,6 +57,14 @@ export interface Payment {
   notes?: string;
 }
 
+export interface FeeRule {
+  id: string;
+  classId: string;
+  amount: number;
+  effectiveFrom: Date;
+  effectiveTo?: Date;
+}
+
 export interface AppCurrency {
   id: string;
   code: Currency;
@@ -73,6 +81,7 @@ export interface ClassWithDetails extends Class {
   totalFees: number;
   totalPaid: number;
   balance: number;
+  creditBalance: number;
 }
 
 export interface DashboardStats {

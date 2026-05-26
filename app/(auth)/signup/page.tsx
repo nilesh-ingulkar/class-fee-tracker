@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
 
   const passwordRequirements = [
     { label: "At least 8 characters", met: password.length >= 8 },
@@ -35,11 +36,12 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!allRequirementsMet) return;
+    if (!allRequirementsMet || !inviteCode.trim()) return;
 
     await submit({
       email,
       password,
+      inviteCode: inviteCode.trim(),
       fullName: name.trim() || undefined,
       emailRedirectTo: getEmailConfirmationRedirectUrl(window.location.origin),
     });
@@ -57,10 +59,12 @@ export default function SignupPage() {
       name={name}
       email={email}
       password={password}
+      inviteCode={inviteCode}
       showPassword={showPassword}
       onNameChange={setName}
       onEmailChange={setEmail}
       onPasswordChange={setPassword}
+      onInviteCodeChange={setInviteCode}
       onTogglePassword={() => setShowPassword((v) => !v)}
       onSubmit={handleSubmit}
       onResendVerification={handleResendVerification}

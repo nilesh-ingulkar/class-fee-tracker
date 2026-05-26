@@ -1,6 +1,7 @@
--- Grants for the existing ClassFeeTracker schema.
--- This adds missing compatibility columns and allows Supabase authenticated
--- users to access tables while your RLS policies still enforce ownership.
+-- Legacy repair script for databases created before supabase/migrations/.
+-- For new projects, run the files in supabase/migrations/ in order instead.
+-- Use this script only when you already have tables and need grants, RLS,
+-- or compatibility columns applied without recreating the schema.
 
 grant usage on schema public to anon, authenticated;
 

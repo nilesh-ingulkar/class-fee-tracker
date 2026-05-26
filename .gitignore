@@ -9,7 +9,22 @@ next.user-config.*
 
 # Environment variables
 .env
+.env.*
 .env*.local
+!.env.example
+!.env.*.example
+
+# Secrets and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*secrets*.json
+service-role*.json
+service_role*.json
+!.env.example
+!*.example.json
 
 # Common ignores
 node_modules
