@@ -38,11 +38,19 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import {
   getAllClassesWithDetails,
   getAllPaymentsWithDetails,
   type PaymentWithDetails,
 } from "@/lib/app-data";
+import {
+  buildExportFilename,
+  downloadTextFile,
+  PAYMENT_EXPORT_COLUMNS,
+  paymentsToExportRows,
+  rowsToCsv,
+} from "@/lib/export";
 import { formatCurrency } from "@/lib/types";
 import { useAppData } from "@/hooks/use-app-data";
 import {
@@ -137,6 +145,22 @@ export default function PaymentsPage() {
     setIsAddDialogOpen(false);
   };
 
+  const childFilterLabel =
+    childFilter === "all"
+      ? undefined
+      : data.children.find((child) => child.id === childFilter)?.name;
+
+  const handleExportPayments = () => {
+    const csv = rowsToCsv(
+      [...PAYMENT_EXPORT_COLUMNS],
+      paymentsToExportRows(visiblePayments),
+    );
+    downloadTextFile(
+      buildExportFilename("payments", childFilterLabel),
+      csv,
+    );
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="blue-panel flex items-start justify-between gap-3 p-4 sm:p-6">
@@ -149,19 +173,24 @@ export default function PaymentsPage() {
             Track and manage all your payments
           </p>
         </div>
-        <Dialog
-          open={isAddDialogOpen}
-          onOpenChange={(open) => {
-            setIsAddDialogOpen(open);
-            if (!open) resetForm();
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Payment</span>
-            </Button>
-          </DialogTrigger>
+        <div className="flex shrink-0 items-center gap-2">
+          <ExportCsvButton
+            disabled={!isReady || visiblePayments.length === 0}
+            onExport={handleExportPayments}
+          />
+          <Dialog
+            open={isAddDialogOpen}
+            onOpenChange={(open) => {
+              setIsAddDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button size="sm" className="shrink-0">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Payment</span>
+              </Button>
+            </DialogTrigger>
           <DialogContent className="mx-4 max-w-[calc(100vw-2rem)] sm:mx-auto sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
@@ -246,7 +275,8 @@ export default function PaymentsPage() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <Card>

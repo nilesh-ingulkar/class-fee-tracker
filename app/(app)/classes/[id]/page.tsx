@@ -281,10 +281,18 @@ export default function ClassDetailPage({
           </CardContent>
         </Card>
 
-        <Card className={classData.balance > 0 ? "border-destructive/50 bg-destructive/5" : ""}>
+        <Card
+          className={
+            classData.balance > 0
+              ? "border-destructive/50 bg-destructive/5"
+              : classData.creditBalance > 0
+                ? "border-green-500/50 bg-green-50"
+                : ""
+          }
+        >
           <CardHeader className="pb-1 px-3 pt-3 sm:px-4 sm:pt-4 sm:pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground truncate">
-              Balance
+              {classData.creditBalance > 0 ? "Credit" : "Balance"}
             </CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
@@ -295,7 +303,9 @@ export default function ClassDetailPage({
             >
               {classData.balance > 0
                 ? formatCurrency(classData.balance, classData.currency)
-                : "Paid"}
+                : classData.creditBalance > 0
+                  ? formatCurrency(classData.creditBalance, classData.currency)
+                  : "Paid"}
             </span>
           </CardContent>
         </Card>

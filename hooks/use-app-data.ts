@@ -96,6 +96,18 @@ function mapCurrency(row: CurrencyRow): AppData["currencies"][number] {
   };
 }
 
+function mapFeeRule(row: FeeRuleRow): AppData["feeRules"][number] {
+  return {
+    id: row.id,
+    classId: row.class_id,
+    amount: Number(row.amount),
+    effectiveFrom: new Date(`${row.effective_from}T00:00:00`),
+    effectiveTo: row.effective_to
+      ? new Date(`${row.effective_to}T00:00:00`)
+      : undefined,
+  };
+}
+
 function getCurrentFeeRule(
   feeRules: FeeRuleRow[],
   classId: string,
@@ -253,6 +265,7 @@ export function useAppData() {
         payments: ((paymentsResult.data ?? []) as PaymentRow[]).map((row) =>
           mapPayment(row, classes),
         ),
+        feeRules: feeRules.map(mapFeeRule),
         currencies: currencies.map(mapCurrency),
       });
       setIsReady(true);
@@ -492,6 +505,7 @@ export function useAppData() {
       setData((current) => ({
         ...current,
         classes: [...current.classes, classRecord],
+        feeRules: [...current.feeRules, mapFeeRule(feeRuleRow)],
       }));
       return classRecord;
     },
@@ -577,6 +591,10 @@ export function useAppData() {
         classes: current.classes.map((item) =>
           item.id === classRecord.id ? classRecord : item,
         ),
+        feeRules: [
+          ...current.feeRules.filter((item) => item.id !== feeRuleRow.id),
+          mapFeeRule(feeRuleRow as FeeRuleRow),
+        ],
       }));
       return classRecord;
     },

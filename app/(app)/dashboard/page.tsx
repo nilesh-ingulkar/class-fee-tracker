@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const stats = getDashboardStats(data);
   const upcomingSessions = getUpcomingSessions(data);
   const activeClasses = getAllClassesWithDetails(data).filter((item) => item.isActive);
+  const paidTotals = Object.entries(stats.totalPaid);
   const [isSessionOpen, setIsSessionOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [sessionClassId, setSessionClassId] = useState("");
@@ -341,33 +342,37 @@ export default function DashboardPage() {
 
       {/* Stats Grid - Always 2 columns */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-4 sm:pt-4 sm:pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Paid (USD)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
-            <span className="text-base font-bold text-green-600 sm:text-lg">
-              {formatCurrency(stats.totalPaid.USD, "USD")}
-            </span>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-1 px-3 pt-3 sm:px-4 sm:pt-4 sm:pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Paid (INR)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
-            <span className="text-base font-bold text-green-600 sm:text-lg">
-              {formatCurrency(stats.totalPaid.INR, "INR")}
-            </span>
-          </CardContent>
-        </Card>
+        {paidTotals.length > 0 ? (
+          paidTotals.map(([currency, amount]) => (
+            <Card key={currency}>
+              <CardHeader className="pb-1 px-3 pt-3 sm:px-4 sm:pt-4 sm:pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Paid ({currency})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
+                <span className="text-base font-bold text-green-600 sm:text-lg">
+                  {formatCurrency(amount, currency)}
+                </span>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <CardHeader className="pb-1 px-3 pt-3 sm:px-4 sm:pt-4 sm:pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Paid</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
+              <span className="text-base font-bold text-green-600 sm:text-lg">
+                {formatCurrency(0, "USD")}
+              </span>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="pb-1 px-3 pt-3 sm:px-4 sm:pt-4 sm:pb-2">
