@@ -4,9 +4,11 @@ import type {
   Class,
   Session,
   Payment,
+  FeeRule,
   ClassWithDetails,
   DashboardStats,
 } from "./types";
+import { calculateClassBalance } from "./fee-engine";
 
 export const mockChildren: Child[] = [
   {
@@ -28,6 +30,7 @@ export const mockTeachers: Teacher[] = [
     id: "teacher-1",
     userId: "user-1",
     name: "Sarah Williams",
+    isActive: true,
     email: "sarah@music.com",
     phone: "+1 555-0101",
   },
@@ -35,6 +38,7 @@ export const mockTeachers: Teacher[] = [
     id: "teacher-2",
     userId: "user-1",
     name: "Michael Chen",
+    isActive: true,
     email: "michael@art.com",
     phone: "+1 555-0102",
   },
@@ -42,6 +46,7 @@ export const mockTeachers: Teacher[] = [
     id: "teacher-3",
     userId: "user-1",
     name: "Priya Sharma",
+    isActive: true,
     email: "priya@math.com",
     phone: "+91 98765-43210",
   },
@@ -232,6 +237,13 @@ export const mockPayments: Payment[] = [
   },
 ];
 
+export const mockFeeRules: FeeRule[] = mockClasses.map((classItem) => ({
+  id: `fee-rule-${classItem.id}`,
+  classId: classItem.id,
+  amount: classItem.feeAmount,
+  effectiveFrom: classItem.createdAt,
+}));
+
 export function getClassWithDetails(classId: string): ClassWithDetails | null {
   const classItem = mockClasses.find((c) => c.id === classId);
   if (!classItem) return null;
@@ -240,17 +252,17 @@ export function getClassWithDetails(classId: string): ClassWithDetails | null {
   const teacher = mockTeachers.find((t) => t.id === classItem.teacherId);
   const sessions = mockSessions.filter((s) => s.classId === classId);
   const payments = mockPayments.filter((p) => p.classId === classId);
+  const feeRules = mockFeeRules.filter((rule) => rule.classId === classId);
 
   if (!child || !teacher) return null;
 
-  const completedSessions = sessions.filter((s) => s.status === "completed");
-  const totalFees =
-    classItem.billingType === "PER_CLASS"
-      ? completedSessions.length * classItem.feeAmount
-      : classItem.feeAmount * 2; // Assuming 2 months of monthly billing
-
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-  const balance = totalFees - totalPaid;
+  const balance = calculateClassBalance({
+    billingType: classItem.billingType,
+    currentFeeAmount: classItem.feeAmount,
+    sessions,
+    payments,
+    feeRules,
+  });
 
   return {
     ...classItem,
@@ -258,9 +270,10 @@ export function getClassWithDetails(classId: string): ClassWithDetails | null {
     teacher,
     sessions,
     payments,
-    totalFees,
-    totalPaid,
-    balance,
+    totalFees: balance.totalFees,
+    totalPaid: balance.totalPaid,
+    balance: balance.balance,
+    creditBalance: balance.creditBalance,
   };
 }
 
@@ -277,10 +290,13 @@ export function getChildClasses(childId: string): ClassWithDetails[] {
 export function getDashboardStats(): DashboardStats {
   const allClasses = getAllClassesWithDetails();
 
-  const totalOutstanding = { USD: 0, INR: 0 };
-  const totalPaid = { USD: 0, INR: 0 };
+  const totalOutstanding: Record<string, number> = {};
+  const totalPaid: Record<string, number> = {};
 
   allClasses.forEach((c) => {
+    totalOutstanding[c.currency] = totalOutstanding[c.currency] ?? 0;
+    totalPaid[c.currency] = totalPaid[c.currency] ?? 0;
+
     if (c.balance > 0) {
       totalOutstanding[c.currency] += c.balance;
     }

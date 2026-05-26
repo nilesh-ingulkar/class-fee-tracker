@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
+import { AuthProvider } from '@/components/auth/auth-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
@@ -8,7 +9,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'ClassFeeTracker - Manage Class Fees & Payments',
+  title: 'Class Fee Tracker - Manage Class Fees & Payments',
   description: 'A modern SaaS application for parents to manage children, teachers, classes, sessions, and fee payments with multi-currency support.',
   generator: 'v0.app',
   icons: {
@@ -45,7 +46,7 @@ export default function RootLayout({
           themes={["light", "dark", "blue"]}
           disableTransitionOnChange
         >
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

@@ -1,9 +1,24 @@
+import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileNav } from "@/components/mobile-nav";
+import { createClient } from "@/lib/supabase/server";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen app-gradient-bg">
       <AppSidebar />
       <MobileNav />
       <main className="lg:pl-64 pb-16 lg:pb-0">

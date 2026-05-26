@@ -1,0 +1,78 @@
+import type { BillingType, FeeRule, Payment, Session } from "@/lib/types";
+
+export type ClassBalanceInput = {
+  billingType: BillingType;
+  currentFeeAmount: number;
+  sessions: Session[];
+  payments: Payment[];
+  feeRules: FeeRule[];
+};
+
+export type ClassBalance = {
+  totalFees: number;
+  totalPaid: number;
+  balance: number;
+  creditBalance: number;
+};
+
+function dateOnlyTime(value: Date): number {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+export function getEffectiveFeeAmount(
+  feeRules: FeeRule[],
+  sessionDate: Date,
+  fallbackAmount: number,
+): number {
+  const sessionTime = dateOnlyTime(sessionDate);
+  const rule = feeRules
+    .filter((item) => {
+      const effectiveFrom = dateOnlyTime(item.effectiveFrom);
+      const effectiveTo = item.effectiveTo ? dateOnlyTime(item.effectiveTo) : null;
+
+      return (
+        effectiveFrom <= sessionTime &&
+        (effectiveTo === null || sessionTime <= effectiveTo)
+      );
+    })
+    .sort(
+      (a, b) =>
+        dateOnlyTime(b.effectiveFrom) - dateOnlyTime(a.effectiveFrom),
+    )[0];
+
+  return rule?.amount ?? fallbackAmount;
+}
+
+export function calculateClassBalance(input: ClassBalanceInput): ClassBalance {
+  const feeRules = input.feeRules;
+  const totalFees =
+    input.billingType === "PER_CLASS"
+      ? input.sessions
+          .filter((session) => session.status === "completed")
+          .reduce(
+            (sum, session) =>
+              sum +
+              getEffectiveFeeAmount(
+                feeRules,
+                session.date,
+                input.currentFeeAmount,
+              ),
+            0,
+          )
+      : input.currentFeeAmount;
+
+  const totalPaid = input.payments.reduce(
+    (sum, payment) => sum + payment.amount,
+    0,
+  );
+  const netBalance = totalFees - totalPaid;
+
+  return {
+    totalFees,
+    totalPaid,
+    balance: Math.max(netBalance, 0),
+    creditBalance: Math.max(-netBalance, 0),
+  };
+}

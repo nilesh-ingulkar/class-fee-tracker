@@ -1,4 +1,4 @@
-export type Currency = "USD" | "INR";
+export type Currency = string;
 
 export type BillingType = "PER_CLASS" | "MONTHLY";
 
@@ -21,6 +21,7 @@ export interface Teacher {
   id: string;
   userId: string;
   name: string;
+  isActive: boolean;
   email?: string;
   phone?: string;
 }
@@ -56,6 +57,22 @@ export interface Payment {
   notes?: string;
 }
 
+export interface FeeRule {
+  id: string;
+  classId: string;
+  amount: number;
+  effectiveFrom: Date;
+  effectiveTo?: Date;
+}
+
+export interface AppCurrency {
+  id: string;
+  code: Currency;
+  symbol: string;
+  name: string;
+  isActive: boolean;
+}
+
 export interface ClassWithDetails extends Class {
   child: Child;
   teacher: Teacher;
@@ -64,23 +81,35 @@ export interface ClassWithDetails extends Class {
   totalFees: number;
   totalPaid: number;
   balance: number;
+  creditBalance: number;
 }
 
 export interface DashboardStats {
-  totalOutstanding: { USD: number; INR: number };
-  totalPaid: { USD: number; INR: number };
+  totalOutstanding: Record<string, number>;
+  totalPaid: Record<string, number>;
   activeClassesCount: number;
   childrenCount: number;
 }
 
 export function formatCurrency(amount: number, currency: Currency): string {
-  const symbol = currency === "USD" ? "$" : "₹";
-  return `${symbol}${amount.toLocaleString("en-US", {
+  const symbols: Record<string, string> = {
+    USD: "$",
+    INR: "₹",
+  };
+  const formattedAmount = amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  });
+  const symbol = symbols[currency];
+
+  return symbol ? `${symbol}${formattedAmount}` : `${currency} ${formattedAmount}`;
 }
 
 export function getCurrencySymbol(currency: Currency): string {
-  return currency === "USD" ? "$" : "₹";
+  const symbols: Record<string, string> = {
+    USD: "$",
+    INR: "₹",
+  };
+
+  return symbols[currency] ?? currency;
 }
