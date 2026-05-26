@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/server";
  * OAuth / email-confirmation redirect target. Exchanges `?code=` for a session
  * and sets auth cookies.
  *
- * In Supabase Dashboard → Authentication → URL Configuration, add this origin path:
- * `https://<your-domain>/auth/callback`
+ * Set NEXT_PUBLIC_SITE_URL and Supabase Auth → Site URL to your production domain.
+ * Add `https://<your-domain>/auth/callback` to Supabase Redirect URLs.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);

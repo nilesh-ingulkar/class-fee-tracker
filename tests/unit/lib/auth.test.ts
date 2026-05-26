@@ -35,7 +35,19 @@ function createMockClient(handlers: {
 const session = { access_token: "token" } as Session;
 
 describe("getEmailConfirmationRedirectUrl", () => {
-  it("builds callback URL with dashboard next path", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("prefers NEXT_PUBLIC_SITE_URL when set", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://app.example.com");
+    expect(getEmailConfirmationRedirectUrl()).toBe(
+      "https://app.example.com/auth/callback?next=%2Fdashboard",
+    );
+  });
+
+  it("falls back to request origin when env is unset", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
     expect(getEmailConfirmationRedirectUrl("https://example.com")).toBe(
       "https://example.com/auth/callback?next=%2Fdashboard",
     );

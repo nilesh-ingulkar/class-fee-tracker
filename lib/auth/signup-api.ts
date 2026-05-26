@@ -6,7 +6,6 @@ export type SignUpApiRequest = {
   password: string;
   inviteCode: string;
   fullName?: string;
-  emailRedirectTo: string;
 };
 
 export type SignUpApiSuccessResponse = {

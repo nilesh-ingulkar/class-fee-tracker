@@ -43,14 +43,13 @@ export default function SignupPage() {
       password,
       inviteCode: inviteCode.trim(),
       fullName: name.trim() || undefined,
-      emailRedirectTo: getEmailConfirmationRedirectUrl(window.location.origin),
     });
   };
 
   const handleResendVerification = async () => {
     await resendVerification({
       email,
-      emailRedirectTo: getEmailConfirmationRedirectUrl(window.location.origin),
+      emailRedirectTo: getEmailConfirmationRedirectUrl(),
     });
   };
 

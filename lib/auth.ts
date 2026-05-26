@@ -1,4 +1,5 @@
 import type { AuthError, Session, SupabaseClient } from "@supabase/supabase-js";
+import { resolveSiteUrl } from "@/lib/site-url";
 
 export const SIGN_UP_SUCCESS_MESSAGE =
   "Check your email to verify your account";
@@ -112,7 +113,12 @@ function hasNoNewIdentity(data: Awaited<ReturnType<SupabaseClient["auth"]["signU
   return Boolean(data.user && data.user.identities?.length === 0);
 }
 
-export function getEmailConfirmationRedirectUrl(origin: string): string {
+/**
+ * Redirect target embedded in Supabase confirmation / resend emails.
+ * Prefer NEXT_PUBLIC_SITE_URL so production emails never point at localhost.
+ */
+export function getEmailConfirmationRedirectUrl(requestOrigin?: string): string {
+  const origin = resolveSiteUrl(requestOrigin);
   return `${origin}/auth/callback?next=${encodeURIComponent("/dashboard")}`;
 }
 

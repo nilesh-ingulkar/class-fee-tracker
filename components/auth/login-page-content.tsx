@@ -55,7 +55,7 @@ export function LoginPageContent() {
   const handleResendVerification = async () => {
     await resendVerification({
       email,
-      emailRedirectTo: getEmailConfirmationRedirectUrl(window.location.origin),
+      emailRedirectTo: getEmailConfirmationRedirectUrl(),
     });
   };
 

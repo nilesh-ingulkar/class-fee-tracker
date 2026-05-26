@@ -14,7 +14,6 @@ const signUpBodySchema = z.object({
   password: z.string().min(8),
   inviteCode: z.string().min(1, "Invite code is required"),
   fullName: z.string().trim().optional(),
-  emailRedirectTo: z.string().url().optional(),
 });
 
 /**
@@ -44,7 +43,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { email, password, inviteCode, fullName, emailRedirectTo } = parsed.data;
+  const { email, password, inviteCode, fullName } = parsed.data;
 
   if (!isInviteCodeValid(inviteCode)) {
     return NextResponse.json<SignUpApiErrorResponse>(
@@ -53,9 +52,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const origin = new URL(request.url).origin;
-  const redirectTo =
-    emailRedirectTo ?? getEmailConfirmationRedirectUrl(origin);
+  // Always build redirect on the server from NEXT_PUBLIC_SITE_URL (not client input).
+  const requestOrigin = new URL(request.url).origin;
+  const redirectTo = getEmailConfirmationRedirectUrl(requestOrigin);
 
   try {
     const supabase = await createClient();

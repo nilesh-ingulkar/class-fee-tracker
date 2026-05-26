@@ -32,7 +32,6 @@ export function useSignUp() {
       password: string;
       inviteCode: string;
       fullName?: string;
-      emailRedirectTo: string;
     }) => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
@@ -47,7 +46,6 @@ export function useSignUp() {
             password: input.password,
             inviteCode: input.inviteCode,
             fullName: input.fullName,
-            emailRedirectTo: input.emailRedirectTo,
           }),
         });
 

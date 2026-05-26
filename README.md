@@ -35,6 +35,7 @@ Copy [`.env.example`](.env.example) to `.env.local` in the project root:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 # Server-only — required for signup (never use NEXT_PUBLIC_ prefix)
 INVITE_CODE=MYFAMILY2026
@@ -42,7 +43,18 @@ INVITE_CODE=MYFAMILY2026
 
 Signup posts to `/api/auth/signup`, which compares `inviteCode` to `INVITE_CODE` on the server before calling Supabase Auth. The invite code is never embedded in the frontend bundle.
 
-**Vercel:** Project → Settings → Environment Variables → add `INVITE_CODE` (and Supabase vars) for Production/Preview, then redeploy. Without `INVITE_CODE`, signup is rejected.
+**Vercel:** Project → Settings → Environment Variables → add `INVITE_CODE`, `NEXT_PUBLIC_SITE_URL` (e.g. `https://your-app.vercel.app`), and Supabase vars for Production, then redeploy.
+
+### Auth email links (fix localhost redirects in production)
+
+Confirmation emails use `NEXT_PUBLIC_SITE_URL` to build `/auth/callback`. If users land on `localhost` after clicking the email link, update **both**:
+
+1. **Vercel** — `NEXT_PUBLIC_SITE_URL=https://your-production-domain` (no trailing slash)
+2. **Supabase Dashboard → Authentication → URL Configuration**
+   - **Site URL** = same production URL
+   - **Redirect URLs** — add `https://your-production-domain/auth/callback`
+
+Redeploy after changing env vars. New signups/resends will use the correct domain.
 
 Run the development server:
 

@@ -11,24 +11,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Class Fee Tracker - Manage Class Fees & Payments',
   description: 'A modern SaaS application for parents to manage children, teachers, classes, sessions, and fee payments with multi-currency support.',
-  generator: 'v0.app',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
+  // Favicon: app/icon.tsx and app/apple-icon.tsx (replaces default v0 assets in public/)
 }
 
 export default function RootLayout({
