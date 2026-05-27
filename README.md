@@ -13,7 +13,7 @@ ClassFeeTracker is a Next.js app for parents to manage children, teachers, class
 - Active/inactive controls for classes and teachers
 - Child-centered Sessions and `/payments` pages with add, edit, and delete
 - Accessible delete confirmations (no native `window.confirm`)
-- Session time picker with **5-minute** increments (custom control; native `<input type="time">` is not used)
+- Session time via native `<input type="time">` (same control on all devices); values snap to **5-minute** marks on blur
 - Export Sessions and Payments to CSV (respects the active child filter; opens in Excel or Google Sheets)
 - Multi-currency fee and payment tracking (symbols from Settings)
 - Dashboard quick actions for sessions and payments
