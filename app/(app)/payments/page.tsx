@@ -38,6 +38,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { ExportCsvButton } from "@/components/export-csv-button";
 import {
   getAllClassesWithDetails,
@@ -72,6 +73,10 @@ export default function PaymentsPage() {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [pendingDeletePaymentId, setPendingDeletePaymentId] = useState<
+    string | null
+  >(null);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
   const allClasses = getAllClassesWithDetails(data).filter((c) => c.isActive);
   const allPayments = getAllPaymentsWithDetails(data);
   const visiblePayments =
@@ -104,9 +109,15 @@ export default function PaymentsPage() {
     setIsAddDialogOpen(true);
   };
 
-  const handleDeletePayment = async (paymentId: string) => {
-    if (!window.confirm("Delete this payment? This cannot be undone.")) return;
-    await deletePayment(paymentId);
+  const handleConfirmDeletePayment = async () => {
+    if (!pendingDeletePaymentId) return;
+    setIsDeletingPayment(true);
+    try {
+      await deletePayment(pendingDeletePaymentId);
+      setPendingDeletePaymentId(null);
+    } finally {
+      setIsDeletingPayment(false);
+    }
   };
 
   const classesForSelectedChild = allClasses.filter(
@@ -368,7 +379,7 @@ export default function PaymentsPage() {
                           </p>
                         </div>
                         <span className="text-sm font-semibold text-green-600 shrink-0">
-                          {formatCurrency(payment.amount, payment.currency)}
+                          {formatCurrency(payment.amount, payment.currency, data.currencies)}
                         </span>
                       </div>
                       {payment.notes ? (
@@ -399,7 +410,7 @@ export default function PaymentsPage() {
                           size="sm"
                           className="flex-1 text-destructive hover:text-destructive"
                           onClick={() => {
-                            void handleDeletePayment(payment.id);
+                            setPendingDeletePaymentId(payment.id)
                           }}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -434,7 +445,7 @@ export default function PaymentsPage() {
                           </TableCell>
                           <TableCell>{payment.className}</TableCell>
                           <TableCell className="text-right font-medium text-green-600">
-                            {formatCurrency(payment.amount, payment.currency)}
+                            {formatCurrency(payment.amount, payment.currency, data.currencies)}
                           </TableCell>
                           <TableCell className="text-muted-foreground max-w-[150px] truncate">
                             {payment.notes || "-"}
@@ -462,7 +473,7 @@ export default function PaymentsPage() {
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
                                 onClick={() => {
-                                  void handleDeletePayment(payment.id);
+                                  setPendingDeletePaymentId(payment.id)
                                 }}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
@@ -480,6 +491,19 @@ export default function PaymentsPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={pendingDeletePaymentId !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingPayment) {
+            setPendingDeletePaymentId(null);
+          }
+        }}
+        title="Delete payment?"
+        description="This payment will be removed permanently. This cannot be undone."
+        onConfirm={handleConfirmDeletePayment}
+        isLoading={isDeletingPayment}
+      />
     </div>
   );
 }

@@ -40,7 +40,13 @@ import {
   getChildClasses,
   type AppData,
 } from "@/lib/app-data";
-import { formatCurrency, type BillingType, type Currency } from "@/lib/types";
+import { getEarliestFeeRuleDate } from "@/lib/fee-rules";
+import {
+  formatCurrency,
+  type BillingType,
+  type Currency,
+  type CurrencyLookup,
+} from "@/lib/types";
 import { useAppData } from "@/hooks/use-app-data";
 import {
   ArrowLeft,
@@ -54,9 +60,11 @@ import {
 
 function ClassCard({
   cls,
+  currencies,
   onEdit,
 }: {
   cls: ReturnType<typeof getAllClassesWithDetails>[number];
+  currencies: CurrencyLookup[];
   onEdit: (cls: ReturnType<typeof getAllClassesWithDetails>[number]) => void;
 }) {
   return (
@@ -86,7 +94,7 @@ function ClassCard({
             </div>
             <div className="flex items-center gap-1">
               <span className="font-medium">
-                {formatCurrency(cls.feeAmount, cls.currency)}
+                {formatCurrency(cls.feeAmount, cls.currency, currencies)}
               </span>
             </div>
           </div>
@@ -95,7 +103,7 @@ function ClassCard({
             <div className="flex items-center justify-between pt-2 border-t text-sm">
               <span className="text-muted-foreground">Balance due</span>
               <span className="font-semibold text-destructive">
-                {formatCurrency(cls.balance, cls.currency)}
+                {formatCurrency(cls.balance, cls.currency, currencies)}
               </span>
             </div>
           ) : null}
@@ -194,7 +202,20 @@ export default function ClassesPage() {
   const [billingType, setBillingType] = useState<BillingType | "">("");
   const [currency, setCurrency] = useState<Currency | "">("");
   const [feeAmount, setFeeAmount] = useState("");
+  const [initialFeeAmount, setInitialFeeAmount] = useState<number | null>(null);
+  const [feeEffectiveFrom, setFeeEffectiveFrom] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
   const [classIsActive, setClassIsActive] = useState(true);
+
+  const feeAmountChanged =
+    editingClassId !== null &&
+    initialFeeAmount !== null &&
+    Math.abs(Number(feeAmount) - initialFeeAmount) > 0.000_001;
+
+  const minEffectiveFrom = editingClassId
+    ? (getEarliestFeeRuleDate(data.feeRules, editingClassId) ?? undefined)
+    : undefined;
 
   const filteredChild = childIdFilter
     ? data.children.find((child) => child.id === childIdFilter)
@@ -220,6 +241,8 @@ export default function ClassesPage() {
     setBillingType("");
     setCurrency("");
     setFeeAmount("");
+    setInitialFeeAmount(null);
+    setFeeEffectiveFrom(new Date().toISOString().split("T")[0]);
     setClassIsActive(true);
   };
 
@@ -233,6 +256,8 @@ export default function ClassesPage() {
     setBillingType(classRecord.billingType);
     setCurrency(classRecord.currency);
     setFeeAmount(String(classRecord.feeAmount));
+    setInitialFeeAmount(classRecord.feeAmount);
+    setFeeEffectiveFrom(new Date().toISOString().split("T")[0]);
     setClassIsActive(classRecord.isActive);
     setIsAddDialogOpen(true);
   };
@@ -247,7 +272,8 @@ export default function ClassesPage() {
       !teacherId ||
       !billingType ||
       !currency ||
-      Number.isNaN(amount)
+      Number.isNaN(amount) ||
+      (feeAmountChanged && !feeEffectiveFrom)
     ) {
       return;
     }
@@ -263,6 +289,7 @@ export default function ClassesPage() {
             billingType,
             currency,
             feeAmount: amount,
+            feeEffectiveFrom: feeAmountChanged ? feeEffectiveFrom : undefined,
             isActive: classIsActive,
           })
         : await addClass({
@@ -463,15 +490,34 @@ export default function ClassesPage() {
                   <Input
                     id="feeAmount"
                     type="number"
+                    inputMode="decimal"
                     placeholder="0.00"
                     value={feeAmount}
                     onChange={(event) => setFeeAmount(event.target.value)}
                     required
                     min="0"
-                    step="0.01"
+                    step="any"
                     disabled={isAddingClass}
                   />
                 </div>
+                {feeAmountChanged ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="feeEffectiveFrom">Rate effective from</Label>
+                    <Input
+                      id="feeEffectiveFrom"
+                      type="date"
+                      value={feeEffectiveFrom}
+                      min={minEffectiveFrom}
+                      onChange={(event) => setFeeEffectiveFrom(event.target.value)}
+                      required
+                      disabled={isAddingClass}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Sessions before this date keep the previous rate. Cannot be
+                      before the first rate date for this class.
+                    </p>
+                  </div>
+                ) : null}
                 {editingClassId ? (
                   <div className="flex items-center justify-between rounded-lg border p-3">
                     <div>
@@ -540,6 +586,7 @@ export default function ClassesPage() {
             <ClassCard
               key={classRecord.id}
               cls={classRecord}
+              currencies={data.currencies}
               onEdit={startEditClass}
             />
           ))}
@@ -584,6 +631,7 @@ export default function ClassesPage() {
                     <ClassCard
                       key={classRecord.id}
                       cls={classRecord}
+                      currencies={data.currencies}
                       onEdit={startEditClass}
                     />
                   ))}

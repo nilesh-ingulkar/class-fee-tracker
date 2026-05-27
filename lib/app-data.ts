@@ -49,6 +49,14 @@ export const emptyAppData: AppData = {
   currencies: [],
 };
 
+export function getFeeRulesForClass(data: AppData, classId: string): FeeRule[] {
+  return data.feeRules
+    .filter((feeRule) => feeRule.classId === classId)
+    .sort(
+      (a, b) => b.effectiveFrom.getTime() - a.effectiveFrom.getTime(),
+    );
+}
+
 export function getClassWithDetails(
   data: AppData,
   classId: string,
@@ -65,7 +73,7 @@ export function getClassWithDetails(
 
   const sessions = data.sessions.filter((session) => session.classId === classId);
   const payments = data.payments.filter((payment) => payment.classId === classId);
-  const feeRules = data.feeRules.filter((feeRule) => feeRule.classId === classId);
+  const feeRules = getFeeRulesForClass(data, classId);
   const classBalance = calculateClassBalance({
     billingType: classItem.billingType,
     currentFeeAmount: classItem.feeAmount,
@@ -80,6 +88,7 @@ export function getClassWithDetails(
     teacher,
     sessions,
     payments,
+    feeRules,
     totalFees: classBalance.totalFees,
     totalPaid: classBalance.totalPaid,
     balance: classBalance.balance,

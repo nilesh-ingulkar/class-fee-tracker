@@ -62,7 +62,11 @@ export function SignUpForm({
   const errorMessage = state.status === "error" ? state.message : null;
   const canResend =
     isSuccess ||
-    (state.status === "error" && state.reason === "account_exists");
+    (state.status === "error" &&
+      (state.reason === "account_exists" || state.reason === "rate_limited"));
+  const showSignInLink =
+    state.status === "error" &&
+    (state.reason === "account_exists" || state.reason === "rate_limited");
   const resendMessage =
     resendState.status === "success" || resendState.status === "error"
       ? resendState.message
@@ -140,6 +144,16 @@ export function SignUpForm({
                     <AlertTitle>Could not sign up</AlertTitle>
                     <AlertDescription className="space-y-2">
                       <p>{errorMessage}</p>
+                      {showSignInLink ? (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="w-full sm:w-auto"
+                        >
+                          <Link href="/login">Go to sign in</Link>
+                        </Button>
+                      ) : null}
                       {canResend ? (
                         <div className="space-y-2">
                           <Button
@@ -147,12 +161,22 @@ export function SignUpForm({
                             variant="outline"
                             size="sm"
                             onClick={onResendVerification}
-                            disabled={isLoading || isResending}
+                            disabled={
+                              isLoading ||
+                              isResending ||
+                              state.reason === "rate_limited"
+                            }
                           >
                             {isResending
                               ? "Sending..."
                               : "Resend verification email"}
                           </Button>
+                          {state.reason === "rate_limited" ? (
+                            <p className="text-xs text-muted-foreground">
+                              Resend is temporarily unavailable while the email
+                              rate limit cools down.
+                            </p>
+                          ) : null}
                           {resendMessage ? (
                             <p
                               className={

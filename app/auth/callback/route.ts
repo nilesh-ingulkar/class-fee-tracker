@@ -1,26 +1,60 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
+import { getPostEmailVerificationRedirectPath } from "@/lib/auth";
+import { resolveSiteUrl } from "@/lib/site-url";
+import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
+
+const OTP_TYPES = new Set<EmailOtpType>([
+  "signup",
+  "invite",
+  "magiclink",
+  "recovery",
+  "email_change",
+  "email",
+]);
 
 /**
- * OAuth / email-confirmation redirect target. Exchanges `?code=` for a session
- * and sets auth cookies.
- *
- * Set NEXT_PUBLIC_SITE_URL and Supabase Auth → Site URL to your production domain.
- * Add `https://<your-domain>/auth/callback` to Supabase Redirect URLs.
+ * Supabase email-confirmation handler (not the final page users see).
+ * Confirms the account, then redirects to /login so the user signs in explicitly.
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const nextRaw = searchParams.get("next") ?? "/dashboard";
-  const next = nextRaw.startsWith("/") ? nextRaw : "/dashboard";
+  const requestUrl = new URL(request.url);
+  const siteOrigin = resolveSiteUrl(requestUrl.origin);
+  const next = getPostEmailVerificationRedirectPath(
+    requestUrl.searchParams.get("next"),
+  );
+  const successUrl = `${siteOrigin}${next}`;
+  const errorUrl = `${siteOrigin}/login?error=auth_callback`;
+
+  const code = requestUrl.searchParams.get("code");
+  const tokenHash = requestUrl.searchParams.get("token_hash");
+  const typeParam = requestUrl.searchParams.get("type");
+  const otpType =
+    typeParam && OTP_TYPES.has(typeParam as EmailOtpType)
+      ? (typeParam as EmailOtpType)
+      : null;
+
+  const response = NextResponse.redirect(errorUrl);
+  const supabase = await createRouteHandlerClient(response);
+
+  let success = false;
 
   if (code) {
-    const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
+    success = !error;
+  } else if (tokenHash && otpType) {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: otpType,
+    });
+    success = !error;
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback`);
+  if (success) {
+    // Confirmation may create a session; sign out so the user must sign in with password.
+    await supabase.auth.signOut();
+    response.headers.set("Location", successUrl);
+  }
+
+  return response;
 }

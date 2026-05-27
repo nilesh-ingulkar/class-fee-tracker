@@ -12,5 +12,5 @@ export function getSupabasePublicConfig(): { url: string; anonKey: string } {
     );
   }
 
-  return { url, anonKey };
+  return { url: url.replace(/\/$/, ""), anonKey };
 }

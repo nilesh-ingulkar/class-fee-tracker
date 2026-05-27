@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { emptyAppData, type AppData } from "@/lib/app-data";
 import type { BillingType, Currency, SessionStatus } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import { getMutationErrorMessage } from "@/lib/supabase/errors";
 import { useAuth } from "@/hooks/use-auth";
 
 type ChildRow = {
@@ -521,82 +522,76 @@ export function useAppData() {
       billingType: BillingType;
       currency: Currency;
       feeAmount: number;
+      feeEffectiveFrom?: string;
       isActive: boolean;
     }) => {
       if (!user) return null;
 
       setError(null);
-      const supabase = createClient();
-      const { data: currencyRow, error: currencyError } = await supabase
-        .from("currencies")
-        .select("id,code,symbol,name,is_active")
-        .eq("code", input.currency)
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
 
-      if (currencyError || !currencyRow) {
-        setError(
-          currencyError?.message ??
-            `Currency ${input.currency} is not active or does not exist.`,
+      try {
+        const response = await fetch(`/api/classes/${input.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            childId: input.childId,
+            teacherId: input.teacherId,
+            name: input.name,
+            billingType: input.billingType,
+            currency: input.currency,
+            feeAmount: input.feeAmount,
+            feeEffectiveFrom: input.feeEffectiveFrom,
+            isActive: input.isActive,
+          }),
+        });
+
+        type UpdateClassResponse = {
+          error?: string;
+          classRow?: ClassRow;
+          currencyRow?: CurrencyRow;
+          feeRuleRows?: FeeRuleRow[];
+          currencyCode?: Currency;
+        };
+
+        let payload: UpdateClassResponse = {};
+
+        try {
+          payload = (await response.json()) as UpdateClassResponse;
+        } catch {
+          payload = {};
+        }
+
+        if (!response.ok) {
+          setError(payload.error ?? "Could not update class.");
+          return null;
+        }
+
+        if (!payload.classRow || !payload.currencyRow || !payload.feeRuleRows) {
+          setError("Could not update class.");
+          return null;
+        }
+
+        const classRecord = mapClass(
+          payload.classRow,
+          [payload.currencyRow],
+          payload.feeRuleRows,
+          payload.currencyCode ?? input.currency,
         );
+        setData((current) => ({
+          ...current,
+          classes: current.classes.map((item) =>
+            item.id === classRecord.id ? classRecord : item,
+          ),
+          feeRules: [
+            ...current.feeRules.filter((rule) => rule.classId !== input.id),
+            ...payload.feeRuleRows!.map(mapFeeRule),
+          ],
+        }));
+        return classRecord;
+      } catch (cause) {
+        setError(getMutationErrorMessage(cause, "Could not update class."));
         return null;
       }
-
-      const { data: row, error: updateError } = await supabase
-        .from("classes")
-        .update({
-          child_id: input.childId,
-          teacher_id: input.teacherId,
-          currency_id: (currencyRow as CurrencyRow).id,
-          class_name: input.name.trim(),
-          billing_type: input.billingType,
-          is_active: input.isActive,
-        })
-        .eq("id", input.id)
-        .select(
-          "id,child_id,teacher_id,currency_id,class_name,billing_type,is_active,created_at",
-        )
-        .single();
-
-      if (updateError || !row) {
-        setError(updateError?.message ?? "Could not update class.");
-        return null;
-      }
-
-      const { data: feeRuleRow, error: feeRuleError } = await supabase
-        .from("fee_rules")
-        .insert({
-          class_id: input.id,
-          amount: input.feeAmount,
-          effective_from: toDateOnly(new Date()),
-        })
-        .select("id,class_id,amount,effective_from,effective_to")
-        .limit(1)
-        .maybeSingle();
-
-      if (feeRuleError || !feeRuleRow) {
-        setError(feeRuleError?.message ?? "Could not update class fee.");
-        return null;
-      }
-
-      const classRecord = mapClass(
-        row as ClassRow,
-        [currencyRow as CurrencyRow],
-        [feeRuleRow as FeeRuleRow],
-        input.currency,
-      );
-      setData((current) => ({
-        ...current,
-        classes: current.classes.map((item) =>
-          item.id === classRecord.id ? classRecord : item,
-        ),
-        feeRules: [
-          ...current.feeRules.filter((item) => item.id !== feeRuleRow.id),
-          mapFeeRule(feeRuleRow as FeeRuleRow),
-        ],
-      }));
-      return classRecord;
     },
     [user],
   );
@@ -649,31 +644,53 @@ export function useAppData() {
       if (!user) return null;
 
       setError(null);
-      const supabase = createClient();
-      const { data: row, error: updateError } = await supabase
-        .from("sessions")
-        .update({
-          session_date: toDateOnly(input.date),
-          session_time: input.startTime || null,
-          status: input.status.toUpperCase(),
-        })
-        .eq("id", input.id)
-        .select("id,class_id,session_date,session_time,status")
-        .single();
 
-      if (updateError || !row) {
-        setError(updateError?.message ?? "Could not update session.");
+      try {
+        const response = await fetch(`/api/sessions/${input.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: toDateOnly(input.date),
+            startTime: input.startTime,
+            status: input.status,
+          }),
+        });
+
+        type UpdateSessionResponse = {
+          error?: string;
+          sessionRow?: SessionRow;
+        };
+
+        let payload: UpdateSessionResponse = {};
+
+        try {
+          payload = (await response.json()) as UpdateSessionResponse;
+        } catch {
+          payload = {};
+        }
+
+        if (!response.ok) {
+          setError(payload.error ?? "Could not update session.");
+          return null;
+        }
+
+        if (!payload.sessionRow) {
+          setError("Could not update session.");
+          return null;
+        }
+
+        const session = mapSession(payload.sessionRow);
+        setData((current) => ({
+          ...current,
+          sessions: current.sessions.map((item) =>
+            item.id === session.id ? session : item,
+          ),
+        }));
+        return session;
+      } catch (cause) {
+        setError(getMutationErrorMessage(cause, "Could not update session."));
         return null;
       }
-
-      const session = mapSession(row as SessionRow);
-      setData((current) => ({
-        ...current,
-        sessions: current.sessions.map((item) =>
-          item.id === session.id ? session : item,
-        ),
-      }));
-      return session;
     },
     [user],
   );

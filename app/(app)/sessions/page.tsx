@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +40,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { TimePicker } from "@/components/time-picker";
 import { ExportCsvButton } from "@/components/export-csv-button";
 import {
   getAllClassesWithDetails,
@@ -48,10 +51,13 @@ import {
 import {
   buildExportFilename,
   downloadTextFile,
+  formatTimeForInput,
   rowsToCsv,
   SESSION_EXPORT_COLUMNS,
   sessionsToExportRows,
+  toIsoDateOnly,
 } from "@/lib/export";
+import { Spinner } from "@/components/ui/spinner";
 import type { SessionStatus } from "@/lib/types";
 import { useAppData } from "@/hooks/use-app-data";
 import {
@@ -98,7 +104,8 @@ function getStatusBadge(status: SessionStatus) {
 }
 
 export default function SessionsPage() {
-  const { data, isReady, addSession, updateSession, deleteSession } = useAppData();
+  const { data, isReady, error, addSession, updateSession, deleteSession } =
+    useAppData();
   const allSessions = getAllSessionsWithDetails(data);
   const activeClasses = getAllClassesWithDetails(data).filter(
     (classRecord) => classRecord.isActive,
@@ -112,6 +119,12 @@ export default function SessionsPage() {
   const [sessionStartTime, setSessionStartTime] = useState("");
   const [sessionStatus, setSessionStatus] =
     useState<SessionStatus>("scheduled");
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<
+    string | null
+  >(null);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const visibleSessions =
     childFilter === "all"
       ? allSessions
@@ -134,47 +147,69 @@ export default function SessionsPage() {
     setSessionDate("");
     setSessionStartTime("");
     setSessionStatus("scheduled");
+    setFormError(null);
   };
 
   const startEditSession = (session: SessionWithDetails) => {
+    setFormError(null);
     setEditingSessionId(session.id);
     setSessionClassId(session.classId);
-    setSessionDate(new Date(session.date).toISOString().split("T")[0]);
-    setSessionStartTime(session.startTime);
+    setSessionDate(toIsoDateOnly(session.date));
+    setSessionStartTime(formatTimeForInput(session.startTime));
     setSessionStatus(session.status);
     setIsDialogOpen(true);
   };
 
   const handleSaveSession = async (event: React.FormEvent) => {
     event.preventDefault();
+    setFormError(null);
 
-    if (!sessionDate || !sessionStartTime || (!editingSessionId && !sessionClassId)) {
+    if (!sessionDate) {
+      setFormError("Enter a session date.");
       return;
     }
 
-    const saved = editingSessionId
-      ? await updateSession({
-          id: editingSessionId,
-          date: new Date(`${sessionDate}T00:00:00`),
-          startTime: sessionStartTime,
-          status: sessionStatus,
-        })
-      : await addSession({
-          classId: sessionClassId,
-          date: new Date(`${sessionDate}T00:00:00`),
-          startTime: sessionStartTime,
-          status: sessionStatus,
-        });
+    if (!editingSessionId && !sessionClassId) {
+      setFormError("Select a class.");
+      return;
+    }
 
-    if (!saved) return;
+    setIsSavingSession(true);
+    try {
+      const saved = editingSessionId
+        ? await updateSession({
+            id: editingSessionId,
+            date: new Date(`${sessionDate}T00:00:00`),
+            startTime: sessionStartTime,
+            status: sessionStatus,
+          })
+        : await addSession({
+            classId: sessionClassId,
+            date: new Date(`${sessionDate}T00:00:00`),
+            startTime: sessionStartTime,
+            status: sessionStatus,
+          });
 
-    resetForm();
-    setIsDialogOpen(false);
+      if (!saved) {
+        return;
+      }
+
+      resetForm();
+      setIsDialogOpen(false);
+    } finally {
+      setIsSavingSession(false);
+    }
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
-    if (!window.confirm("Delete this session? This cannot be undone.")) return;
-    await deleteSession(sessionId);
+  const handleConfirmDeleteSession = async () => {
+    if (!pendingDeleteSessionId) return;
+    setIsDeletingSession(true);
+    try {
+      await deleteSession(pendingDeleteSessionId);
+      setPendingDeleteSessionId(null);
+    } finally {
+      setIsDeletingSession(false);
+    }
   };
 
   const childFilterLabel =
@@ -235,6 +270,17 @@ export default function SessionsPage() {
             </DialogHeader>
             <form onSubmit={handleSaveSession}>
               <div className="space-y-4 py-4">
+                {formError || error ? (
+                  <Alert variant="destructive">
+                    <AlertTitle>
+                      {editingSessionId
+                        ? "Could not update session"
+                        : "Could not add session"}
+                    </AlertTitle>
+                    <AlertDescription>{formError ?? error}</AlertDescription>
+                  </Alert>
+                ) : null}
+
                 {!editingSessionId ? (
                   <div className="space-y-2">
                     <Label htmlFor="classId">Class</Label>
@@ -269,13 +315,15 @@ export default function SessionsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="startTime">Time</Label>
-                  <Input
+                  <TimePicker
                     id="startTime"
-                    type="time"
                     value={sessionStartTime}
-                    onChange={(event) => setSessionStartTime(event.target.value)}
-                    required
+                    onChange={setSessionStartTime}
+                    optional
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Optional — leave blank if no specific time.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
@@ -306,9 +354,21 @@ export default function SessionsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!editingSessionId && classesForSelectedChild.length === 0}
+                  disabled={
+                    isSavingSession ||
+                    (!editingSessionId && classesForSelectedChild.length === 0)
+                  }
                 >
-                  {editingSessionId ? "Save Session" : "Add Session"}
+                  {isSavingSession ? (
+                    <>
+                      <Spinner className="mr-2" />
+                      Saving...
+                    </>
+                  ) : editingSessionId ? (
+                    "Save changes"
+                  ) : (
+                    "Add Session"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -439,9 +499,7 @@ export default function SessionsPage() {
                           variant="outline"
                           size="sm"
                           className="flex-1 text-destructive hover:text-destructive"
-                          onClick={() => {
-                            void handleDeleteSession(session.id);
-                          }}
+                          onClick={() => setPendingDeleteSessionId(session.id)}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
@@ -502,9 +560,9 @@ export default function SessionsPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
-                                onClick={() => {
-                                  void handleDeleteSession(session.id);
-                                }}
+                                onClick={() =>
+                                  setPendingDeleteSessionId(session.id)
+                                }
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -521,6 +579,19 @@ export default function SessionsPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={pendingDeleteSessionId !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingSession) {
+            setPendingDeleteSessionId(null);
+          }
+        }}
+        title="Delete session?"
+        description="This session will be removed permanently. This cannot be undone."
+        onConfirm={handleConfirmDeleteSession}
+        isLoading={isDeletingSession}
+      />
     </div>
   );
 }

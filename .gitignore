@@ -23,7 +23,6 @@ next.user-config.*
 *secrets*.json
 service-role*.json
 service_role*.json
-!.env.example
 !*.example.json
 
 # Common ignores
@@ -38,6 +37,3 @@ out/
 *.log
 *.debug
 *.tmp
-
-# OS
-.DS_Store
