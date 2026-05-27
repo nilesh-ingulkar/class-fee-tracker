@@ -7,6 +7,7 @@ import {
   getChildClasses,
   getClassWithDetails,
   getDashboardStats,
+  getFeeRulesForClass,
   getUpcomingSessions,
   type AppData,
 } from "@/lib/app-data";
@@ -100,12 +101,21 @@ function payment(
   };
 }
 
-function feeRule(classId: string, amount: number): FeeRule {
+function feeRule(
+  id: string,
+  classId: string,
+  amount: number,
+  effectiveFrom: string,
+  effectiveTo?: string,
+): FeeRule {
   return {
-    id: `fee-${classId}`,
+    id,
     classId,
     amount,
-    effectiveFrom: new Date("2024-01-01"),
+    effectiveFrom: new Date(`${effectiveFrom}T00:00:00`),
+    effectiveTo: effectiveTo
+      ? new Date(`${effectiveTo}T00:00:00`)
+      : undefined,
   };
 }
 
@@ -128,9 +138,9 @@ function buildAppData(overrides: Partial<AppData> = {}): AppData {
       payment("p4", "class-3", 400, "INR"),
     ],
     feeRules: [
-      feeRule("class-1", 45),
-      feeRule("class-2", 200),
-      feeRule("class-3", 800),
+      feeRule("fee-1", "class-1", 45, "2024-01-01"),
+      feeRule("fee-2", "class-2", 200, "2024-01-01"),
+      feeRule("fee-3", "class-3", 800, "2024-01-01"),
     ],
     currencies: [
       { id: "cur-usd", code: "USD", symbol: "$", name: "US Dollar", isActive: true },
@@ -173,6 +183,58 @@ describe("getClassWithDetails", () => {
     expect(details?.totalPaid).toBe(400);
     expect(details?.balance).toBe(0);
     expect(details?.creditBalance).toBe(400);
+  });
+
+  it("includes sorted fee rules on class details", () => {
+    const data = buildAppData({
+      feeRules: [
+        feeRule("fee-old", "class-1", 40, "2024-01-01", "2024-05-31"),
+        feeRule("fee-new", "class-1", 55, "2024-06-01"),
+        feeRule("fee-other", "class-2", 200, "2024-01-01"),
+      ],
+    });
+
+    const details = getClassWithDetails(data, "class-1");
+    expect(details?.feeRules).toHaveLength(2);
+    expect(details?.feeRules[0]?.id).toBe("fee-new");
+    expect(details?.feeRules[0]?.effectiveTo).toBeUndefined();
+    expect(details?.feeRules[1]?.id).toBe("fee-old");
+  });
+});
+
+describe("getFeeRulesForClass", () => {
+  it("returns only rules for the requested class sorted newest first", () => {
+    const data = buildAppData({
+      feeRules: [
+        feeRule("fee-a", "class-1", 40, "2024-01-01", "2024-05-31"),
+        feeRule("fee-b", "class-1", 50, "2024-06-01", "2024-08-31"),
+        feeRule("fee-c", "class-1", 55, "2024-09-01"),
+        feeRule("fee-d", "class-2", 200, "2024-01-01"),
+      ],
+    });
+
+    const rules = getFeeRulesForClass(data, "class-1");
+    expect(rules).toHaveLength(3);
+    expect(rules.map((rule) => rule.id)).toEqual(["fee-c", "fee-b", "fee-a"]);
+  });
+
+  it("identifies the current rule as the one without effectiveTo", () => {
+    const data = buildAppData({
+      feeRules: [
+        feeRule("fee-a", "class-1", 40, "2024-01-01", "2024-05-31"),
+        feeRule("fee-b", "class-1", 55, "2024-06-01"),
+      ],
+    });
+
+    const current = getFeeRulesForClass(data, "class-1").find(
+      (rule) => !rule.effectiveTo,
+    );
+    expect(current?.id).toBe("fee-b");
+    expect(current?.amount).toBe(55);
+  });
+
+  it("returns an empty array when the class has no rules", () => {
+    expect(getFeeRulesForClass(buildAppData(), "missing")).toEqual([]);
   });
 });
 
@@ -217,7 +279,7 @@ describe("getDashboardStats", () => {
       classes: [perClass],
       sessions: [session("s-only", "class-1", "2024-03-15", "completed")],
       payments: [],
-      feeRules: [feeRule("class-1", 45)],
+      feeRules: [feeRule("fee-1", "class-1", 45, "2024-01-01")],
       currencies: [],
     };
     const stats = getDashboardStats(data);

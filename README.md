@@ -7,10 +7,17 @@ ClassFeeTracker is a Next.js app for parents to manage children, teachers, class
 - Supabase email/password authentication with email verification and server-side invite code gate
 - Protected app routes with server-side session refresh
 - Children, teachers, classes, sessions, payments, and currency management
+- **Per-class** and **monthly** billing with balance calculations driven by historical fee rules
+- **Fee rate history** (`fee_rules` table): change rates with an effective date; view read-only history on each class detail page
+- Class list and **class detail** (`/classes/[id]`) — sessions, payments, financial summary, rate history
 - Active/inactive controls for classes and teachers
-- Child-centered Sessions and Pay pages
+- Child-centered Sessions and `/payments` pages with add, edit, and delete
+- Accessible delete confirmations (no native `window.confirm`)
+- Session time picker with **5-minute** increments (custom control; native `<input type="time">` is not used)
 - Export Sessions and Payments to CSV (respects the active child filter; opens in Excel or Google Sheets)
-- Multi-currency fee and payment tracking
+- Multi-currency fee and payment tracking (symbols from Settings)
+- Dashboard quick actions for sessions and payments
+- Theme options (light, dark, professional blue) in Settings
 - Responsive UI with a soft blue background and white content cards
 
 ## Tech Stack
@@ -21,6 +28,10 @@ ClassFeeTracker is a Next.js app for parents to manage children, teachers, class
 - Supabase Auth and Database
 - Tailwind CSS
 - Radix UI components
+
+## Requirements
+
+- Node.js **20.9+** and npm **10+** (see `package.json` `engines`)
 
 ## Getting Started
 
@@ -82,21 +93,33 @@ npm run build
 npm run start
 npm run lint
 npm test
+npm run test:watch   # optional — Vitest watch mode
 ```
 
 ## Project Structure
 
-- `app/` - Next.js routes and page UI
-- `components/` - shared UI, auth, and export components
-- `hooks/` - auth and app data hooks
-- `lib/` - auth, Supabase, types, app data helpers, and CSV export utilities
-- `supabase/` - database support SQL
-- `tests/unit/` - unit tests (mirrors `lib/` structure)
+- `app/` — Next.js routes and page UI (`(app)/` authenticated shell, `(auth)/` login/signup)
+- `app/(app)/classes/[id]/` — class detail (sessions, payments, rate history)
+- `app/api/auth/signup/` — server-side invite validation and Supabase signup
+- `app/api/classes/[id]/` — `PATCH` class updates and fee-rule changes (cookie auth)
+- `app/api/sessions/[id]/` — `PATCH` session updates (cookie auth)
+- `components/` — shared UI, auth (`app-sidebar`, `mobile-nav`), `export-csv-button`, `fee-rate-history-card`, `time-picker`, `confirm-delete-dialog`
+- `hooks/` — `use-auth`, `use-app-data` (client data + mutations)
+- `lib/` — auth, Supabase, types, `app-data`, `fee-engine`, `fee-rules`, `invite-code`, `site-url`
+- `lib/classes/`, `lib/sessions/` — server-side update helpers used by API routes
+- `lib/export/` — CSV export and date/time formatting helpers
+- `proxy.ts` — session refresh and route protection (not a root `middleware.ts`; `/api` routes are excluded from the matcher)
+- `supabase/migrations/` — schema, RLS, grants
+- `tests/unit/` — Vitest unit tests (mirrors `lib/` structure)
 
 ## Notes
 
 - Authentication routes are `/login`, `/signup`, `/verify-email`, and `/forgot-password`.
-- Authenticated app routes are protected through `proxy.ts`.
+- `/forgot-password` is a UI placeholder only (no Supabase password reset yet).
+- Authenticated app routes are protected through [`proxy.ts`](proxy.ts), which calls [`lib/supabase/middleware.ts`](lib/supabase/middleware.ts) for session refresh and redirects.
+- Main app routes: `/dashboard`, `/children`, `/classes`, `/classes/[id]`, `/teachers`, `/sessions`, `/payments`, `/settings`.
+- **Changing a class fee:** use **Classes → Edit**, enter the new amount and **Rate effective from**; prior rules are closed in `fee_rules` automatically. View history on the class detail page.
+- Class and session updates that need reliable auth cookies use **`/api/classes/[id]`** and **`/api/sessions/[id]`** from the browser; other reads/writes still use the Supabase client in `use-app-data`.
 - Sessions and payments can be added, edited, and deleted from the app UI.
 
 ## Session security (Supabase)

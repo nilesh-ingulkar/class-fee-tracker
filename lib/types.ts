@@ -78,6 +78,7 @@ export interface ClassWithDetails extends Class {
   teacher: Teacher;
   sessions: Session[];
   payments: Payment[];
+  feeRules: FeeRule[];
   totalFees: number;
   totalPaid: number;
   balance: number;
@@ -91,25 +92,50 @@ export interface DashboardStats {
   childrenCount: number;
 }
 
-export function formatCurrency(amount: number, currency: Currency): string {
-  const symbols: Record<string, string> = {
-    USD: "$",
-    INR: "₹",
-  };
+export type CurrencyLookup = Pick<AppCurrency, "code" | "symbol">;
+
+const BUILTIN_CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  INR: "₹",
+};
+
+/**
+ * Resolves display symbol: user-defined (Settings) first, then built-in fallbacks.
+ */
+export function resolveCurrencySymbol(
+  currency: Currency,
+  currencies?: CurrencyLookup[],
+): string {
+  const fromSettings = currencies
+    ?.find((item) => item.code === currency)
+    ?.symbol?.trim();
+  if (fromSettings) {
+    return fromSettings;
+  }
+  return BUILTIN_CURRENCY_SYMBOLS[currency] ?? currency;
+}
+
+export function formatCurrency(
+  amount: number,
+  currency: Currency,
+  currencies?: CurrencyLookup[],
+): string {
   const formattedAmount = amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  const symbol = symbols[currency];
+  const symbol = resolveCurrencySymbol(currency, currencies);
 
-  return symbol ? `${symbol}${formattedAmount}` : `${currency} ${formattedAmount}`;
+  if (symbol === currency) {
+    return `${currency} ${formattedAmount}`;
+  }
+
+  return `${symbol}${formattedAmount}`;
 }
 
-export function getCurrencySymbol(currency: Currency): string {
-  const symbols: Record<string, string> = {
-    USD: "$",
-    INR: "₹",
-  };
-
-  return symbols[currency] ?? currency;
+export function getCurrencySymbol(
+  currency: Currency,
+  currencies?: CurrencyLookup[],
+): string {
+  return resolveCurrencySymbol(currency, currencies);
 }

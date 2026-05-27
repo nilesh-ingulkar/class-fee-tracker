@@ -42,14 +42,14 @@ describe("getEmailConfirmationRedirectUrl", () => {
   it("prefers NEXT_PUBLIC_SITE_URL when set", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://app.example.com");
     expect(getEmailConfirmationRedirectUrl()).toBe(
-      "https://app.example.com/auth/callback?next=%2Fdashboard",
+      "https://app.example.com/auth/callback?next=%2Flogin%3Fverified%3D1",
     );
   });
 
   it("falls back to request origin when env is unset", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
     expect(getEmailConfirmationRedirectUrl("https://example.com")).toBe(
-      "https://example.com/auth/callback?next=%2Fdashboard",
+      "https://example.com/auth/callback?next=%2Flogin%3Fverified%3D1",
     );
   });
 });

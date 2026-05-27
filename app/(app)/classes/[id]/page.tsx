@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +41,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { FeeRateHistoryCard } from "@/components/fee-rate-history-card";
+import { TimePicker } from "@/components/time-picker";
+import { Spinner } from "@/components/ui/spinner";
 import { getClassWithDetails } from "@/lib/app-data";
+import { formatTimeForInput, toIsoDateOnly } from "@/lib/export";
 import { formatCurrency, getCurrencySymbol } from "@/lib/types";
 import type { SessionStatus } from "@/lib/types";
 import { useAppData } from "@/hooks/use-app-data";
@@ -49,7 +55,7 @@ import {
   User,
   GraduationCap,
   Calendar,
-  DollarSign,
+  Coins,
   Plus,
   Clock,
   CheckCircle,
@@ -96,6 +102,7 @@ export default function ClassDetailPage({
   const {
     data,
     isReady,
+    error,
     addPayment,
     addSession,
     updatePayment,
@@ -117,6 +124,12 @@ export default function ClassDetailPage({
     new Date().toISOString().split("T")[0],
   );
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<
+    { type: "session"; id: string } | { type: "payment"; id: string } | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [sessionFormError, setSessionFormError] = useState<string | null>(null);
 
   if (!isReady) {
     return (
@@ -142,32 +155,50 @@ export default function ClassDetailPage({
 
   const handleAddSession = async (event: React.FormEvent) => {
     event.preventDefault();
+    setSessionFormError(null);
 
-    if (!sessionDate || !sessionStartTime) {
+    if (!sessionDate) {
+      setSessionFormError("Enter a session date.");
       return;
     }
 
-    const saved = editingSessionId
-      ? await updateSession({
-          id: editingSessionId,
-          date: new Date(`${sessionDate}T00:00:00`),
-          startTime: sessionStartTime,
-          status: sessionStatus,
-        })
-      : await addSession({
-          classId: classData.id,
-          date: new Date(`${sessionDate}T00:00:00`),
-          startTime: sessionStartTime,
-          status: sessionStatus,
-        });
+    setIsSavingSession(true);
+    try {
+      const saved = editingSessionId
+        ? await updateSession({
+            id: editingSessionId,
+            date: new Date(`${sessionDate}T00:00:00`),
+            startTime: sessionStartTime,
+            status: sessionStatus,
+          })
+        : await addSession({
+            classId: classData.id,
+            date: new Date(`${sessionDate}T00:00:00`),
+            startTime: sessionStartTime,
+            status: sessionStatus,
+          });
 
-    if (!saved) return;
+      if (!saved) {
+        return;
+      }
 
-    setEditingSessionId(null);
-    setSessionDate("");
-    setSessionStartTime("");
-    setSessionStatus("scheduled");
-    setIsAddSessionOpen(false);
+      setEditingSessionId(null);
+      setSessionDate("");
+      setSessionStartTime("");
+      setSessionStatus("scheduled");
+      setIsAddSessionOpen(false);
+    } finally {
+      setIsSavingSession(false);
+    }
+  };
+
+  const openSessionEditor = (session: (typeof sortedSessions)[number]) => {
+    setSessionFormError(null);
+    setEditingSessionId(session.id);
+    setSessionDate(toIsoDateOnly(session.date));
+    setSessionStartTime(formatTimeForInput(session.startTime));
+    setSessionStatus(session.status);
+    setIsAddSessionOpen(true);
   };
 
   const handleAddPayment = async (event: React.FormEvent) => {
@@ -202,14 +233,19 @@ export default function ClassDetailPage({
     setIsAddPaymentOpen(false);
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
-    if (!window.confirm("Delete this session? This cannot be undone.")) return;
-    await deleteSession(sessionId);
-  };
-
-  const handleDeletePayment = async (paymentId: string) => {
-    if (!window.confirm("Delete this payment? This cannot be undone.")) return;
-    await deletePayment(paymentId);
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    try {
+      if (pendingDelete.type === "session") {
+        await deleteSession(pendingDelete.id);
+      } else {
+        await deletePayment(pendingDelete.id);
+      }
+      setPendingDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -244,11 +280,19 @@ export default function ClassDetailPage({
             <span className="truncate">{classData.teacher.name}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <DollarSign className="h-3.5 w-3.5 shrink-0" />
+            <Coins className="h-3.5 w-3.5 shrink-0" />
             <span>
-              {formatCurrency(classData.feeAmount, classData.currency)}
+              {formatCurrency(classData.feeAmount, classData.currency, data.currencies)}
               {classData.billingType === "PER_CLASS" ? "/session" : "/month"}
             </span>
+            {classData.feeRules.length > 0 ? (
+              <a
+                href="#rate-history"
+                className="text-primary hover:underline underline-offset-2"
+              >
+                View rate history
+              </a>
+            ) : null}
           </div>
         </div>
       </div>
@@ -263,7 +307,7 @@ export default function ClassDetailPage({
           </CardHeader>
           <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
             <span className="text-sm font-bold sm:text-lg">
-              {formatCurrency(classData.totalFees, classData.currency)}
+              {formatCurrency(classData.totalFees, classData.currency, data.currencies)}
             </span>
           </CardContent>
         </Card>
@@ -276,7 +320,7 @@ export default function ClassDetailPage({
           </CardHeader>
           <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
             <span className="text-sm font-bold text-green-600 sm:text-lg">
-              {formatCurrency(classData.totalPaid, classData.currency)}
+              {formatCurrency(classData.totalPaid, classData.currency, data.currencies)}
             </span>
           </CardContent>
         </Card>
@@ -327,6 +371,7 @@ export default function ClassDetailPage({
                 setSessionDate("");
                 setSessionStartTime("");
                 setSessionStatus("scheduled");
+                setSessionFormError(null);
               }
             }}
           >
@@ -347,6 +392,19 @@ export default function ClassDetailPage({
               </DialogHeader>
               <form onSubmit={handleAddSession}>
                 <div className="space-y-4 py-4">
+                  {sessionFormError || error ? (
+                    <Alert variant="destructive">
+                      <AlertTitle>
+                        {editingSessionId
+                          ? "Could not update session"
+                          : "Could not add session"}
+                      </AlertTitle>
+                      <AlertDescription>
+                        {sessionFormError ?? error}
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+
                   <div className="space-y-2">
                     <Label htmlFor="sessionDate">Date</Label>
                     <Input
@@ -359,15 +417,15 @@ export default function ClassDetailPage({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="startTime">Time</Label>
-                    <Input
+                    <TimePicker
                       id="startTime"
-                      type="time"
                       value={sessionStartTime}
-                      onChange={(event) =>
-                        setSessionStartTime(event.target.value)
-                      }
-                      required
+                      onChange={setSessionStartTime}
+                      optional
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Optional — leave blank if no specific time.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
@@ -399,8 +457,17 @@ export default function ClassDetailPage({
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">
-                    {editingSessionId ? "Save Session" : "Add Session"}
+                  <Button type="submit" disabled={isSavingSession}>
+                    {isSavingSession ? (
+                      <>
+                        <Spinner className="mr-2" />
+                        Saving...
+                      </>
+                    ) : editingSessionId ? (
+                      "Save changes"
+                    ) : (
+                      "Add Session"
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
@@ -450,15 +517,7 @@ export default function ClassDetailPage({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setEditingSessionId(session.id);
-                            setSessionDate(
-                              new Date(session.date).toISOString().split("T")[0],
-                            );
-                            setSessionStartTime(session.startTime);
-                            setSessionStatus(session.status);
-                            setIsAddSessionOpen(true);
-                          }}
+                          onClick={() => openSessionEditor(session)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -468,7 +527,7 @@ export default function ClassDetailPage({
                           size="sm"
                           className="text-destructive hover:text-destructive"
                           onClick={() => {
-                            void handleDeleteSession(session.id);
+                            setPendingDelete({ type: "session", id: session.id })
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -516,15 +575,7 @@ export default function ClassDetailPage({
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                setEditingSessionId(session.id);
-                                setSessionDate(
-                                  new Date(session.date).toISOString().split("T")[0],
-                                );
-                                setSessionStartTime(session.startTime);
-                                setSessionStatus(session.status);
-                                setIsAddSessionOpen(true);
-                              }}
+                              onClick={() => openSessionEditor(session)}
                             >
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
@@ -535,7 +586,7 @@ export default function ClassDetailPage({
                               size="sm"
                               className="text-destructive hover:text-destructive"
                               onClick={() => {
-                                void handleDeleteSession(session.id);
+                                setPendingDelete({ type: "session", id: session.id })
                               }}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -591,7 +642,7 @@ export default function ClassDetailPage({
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="amount">
-                      Amount ({getCurrencySymbol(classData.currency)})
+                      Amount ({getCurrencySymbol(classData.currency, data.currencies)})
                     </Label>
                     <Input
                       id="amount"
@@ -683,7 +734,7 @@ export default function ClassDetailPage({
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-sm font-semibold text-green-600">
-                        {formatCurrency(payment.amount, payment.currency)}
+                        {formatCurrency(payment.amount, payment.currency, data.currencies)}
                       </span>
                       <Button
                         type="button"
@@ -707,7 +758,7 @@ export default function ClassDetailPage({
                         size="sm"
                         className="text-destructive hover:text-destructive"
                         onClick={() => {
-                          void handleDeletePayment(payment.id);
+                          setPendingDelete({ type: "payment", id: payment.id })
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -739,7 +790,7 @@ export default function ClassDetailPage({
                           })}
                         </TableCell>
                         <TableCell className="text-green-600 font-medium">
-                          {formatCurrency(payment.amount, payment.currency)}
+                          {formatCurrency(payment.amount, payment.currency, data.currencies)}
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-[200px] truncate">
                           {payment.notes || "-"}
@@ -769,7 +820,7 @@ export default function ClassDetailPage({
                               size="sm"
                               className="text-destructive hover:text-destructive"
                               onClick={() => {
-                                void handleDeletePayment(payment.id);
+                                setPendingDelete({ type: "payment", id: payment.id })
                               }}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -786,6 +837,33 @@ export default function ClassDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <FeeRateHistoryCard
+        rules={classData.feeRules}
+        currency={classData.currency}
+        currencies={data.currencies}
+        billingType={classData.billingType}
+        classId={classData.id}
+      />
+
+      <ConfirmDeleteDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setPendingDelete(null);
+          }
+        }}
+        title={
+          pendingDelete?.type === "payment" ? "Delete payment?" : "Delete session?"
+        }
+        description={
+          pendingDelete?.type === "payment"
+            ? "This payment will be removed permanently. This cannot be undone."
+            : "This session will be removed permanently. This cannot be undone."
+        }
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

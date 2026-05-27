@@ -28,8 +28,9 @@ import {
 } from "@/lib/app-data";
 import { formatCurrency, type SessionStatus } from "@/lib/types";
 import { useAppData } from "@/hooks/use-app-data";
+import { TimePicker } from "@/components/time-picker";
 import {
-  DollarSign,
+  Coins,
   TrendingUp,
   GraduationCap,
   Users,
@@ -182,11 +183,9 @@ export default function DashboardPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Time</Label>
-                      <Input
-                        type="time"
+                      <TimePicker
                         value={sessionTime}
-                        onChange={(event) => setSessionTime(event.target.value)}
-                        required
+                        onChange={setSessionTime}
                       />
                     </div>
                   </div>
@@ -298,7 +297,7 @@ export default function DashboardPage() {
         <CardHeader className="pb-2 px-4 pt-4 sm:px-6">
           <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2 sm:text-sm">
             <span className="sky-icon h-8 w-8">
-              <DollarSign className="h-4 w-4 shrink-0" />
+              <Coins className="h-4 w-4 shrink-0" />
             </span>
             <span className="truncate">Outstanding Balance By Child</span>
           </CardTitle>
@@ -322,7 +321,7 @@ export default function DashboardPage() {
                       key={currency}
                     className="text-sm font-bold text-primary sm:text-base"
                     >
-                      {formatCurrency(amount, currency)}
+                      {formatCurrency(amount, currency, data.currencies)}
                     </span>
                   ))}
                 </div>
@@ -353,7 +352,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
                 <span className="text-base font-bold text-green-600 sm:text-lg">
-                  {formatCurrency(amount, currency)}
+                  {formatCurrency(amount, currency, data.currencies)}
                 </span>
               </CardContent>
             </Card>
@@ -368,7 +367,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
               <span className="text-base font-bold text-green-600 sm:text-lg">
-                {formatCurrency(0, "USD")}
+                {formatCurrency(0, "USD", data.currencies)}
               </span>
             </CardContent>
           </Card>

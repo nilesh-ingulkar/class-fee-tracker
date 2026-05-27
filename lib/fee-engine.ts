@@ -45,6 +45,41 @@ export function getEffectiveFeeAmount(
   return rule?.amount ?? fallbackAmount;
 }
 
+function getCompletedSessionYearMonths(sessions: Session[]): string[] {
+  const months = new Set<string>();
+
+  for (const session of sessions) {
+    if (session.status !== "completed") continue;
+    const date = session.date;
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    months.add(`${date.getFullYear()}-${month}`);
+  }
+
+  return [...months].sort();
+}
+
+function firstDayOfYearMonth(yearMonth: string): Date {
+  const [year, month] = yearMonth.split("-").map(Number);
+  return new Date(year, month - 1, 1);
+}
+
+function calculateMonthlyFees(
+  sessions: Session[],
+  feeRules: FeeRule[],
+  fallbackAmount: number,
+): number {
+  return getCompletedSessionYearMonths(sessions).reduce(
+    (sum, yearMonth) =>
+      sum +
+      getEffectiveFeeAmount(
+        feeRules,
+        firstDayOfYearMonth(yearMonth),
+        fallbackAmount,
+      ),
+    0,
+  );
+}
+
 export function calculateClassBalance(input: ClassBalanceInput): ClassBalance {
   const feeRules = input.feeRules;
   const totalFees =
@@ -61,7 +96,11 @@ export function calculateClassBalance(input: ClassBalanceInput): ClassBalance {
               ),
             0,
           )
-      : input.currentFeeAmount;
+      : calculateMonthlyFees(
+          input.sessions,
+          feeRules,
+          input.currentFeeAmount,
+        );
 
   const totalPaid = input.payments.reduce(
     (sum, payment) => sum + payment.amount,

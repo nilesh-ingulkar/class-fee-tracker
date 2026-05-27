@@ -263,11 +263,12 @@ describe("calculateClassBalance — MONTHLY billing", () => {
     const result = calculateClassBalance({
       billingType: "MONTHLY",
       currentFeeAmount: 200,
-      sessions: [],
+      sessions: [session("s1", "2024-03-01", "completed")],
       payments: [payment("p1", 75)],
       feeRules: [],
     });
 
+    expect(result.totalFees).toBe(200);
     expect(result.balance).toBe(125);
     expect(result.creditBalance).toBe(0);
   });
@@ -276,13 +277,61 @@ describe("calculateClassBalance — MONTHLY billing", () => {
     const result = calculateClassBalance({
       billingType: "MONTHLY",
       currentFeeAmount: 200,
-      sessions: [],
+      sessions: [session("s1", "2024-03-01", "completed")],
       payments: [payment("p1", 250)],
       feeRules: [],
     });
 
+    expect(result.totalFees).toBe(200);
     expect(result.balance).toBe(0);
     expect(result.creditBalance).toBe(50);
+  });
+
+  it("returns zero monthly fees when there are no completed sessions", () => {
+    const result = calculateClassBalance({
+      billingType: "MONTHLY",
+      currentFeeAmount: 200,
+      sessions: [session("s1", "2024-03-01", "scheduled")],
+      payments: [payment("p1", 75)],
+      feeRules: [],
+    });
+
+    expect(result.totalFees).toBe(0);
+    expect(result.creditBalance).toBe(75);
+  });
+
+  it("charges once per calendar month with completed sessions", () => {
+    const result = calculateClassBalance({
+      billingType: "MONTHLY",
+      currentFeeAmount: 200,
+      sessions: [
+        session("s1", "2024-03-01", "completed"),
+        session("s2", "2024-03-08", "completed"),
+        session("s3", "2024-04-01", "completed"),
+      ],
+      payments: [],
+      feeRules: [],
+    });
+
+    expect(result.totalFees).toBe(400);
+  });
+
+  it("uses historical rates per month when fee rules change", () => {
+    const result = calculateClassBalance({
+      billingType: "MONTHLY",
+      currentFeeAmount: 250,
+      sessions: [
+        session("s1", "2024-05-15", "completed"),
+        session("s2", "2024-06-15", "completed"),
+      ],
+      payments: [],
+      feeRules: [
+        feeRule("old", 200, "2024-01-01", "2024-05-31"),
+        feeRule("new", 250, "2024-06-01"),
+      ],
+    });
+
+    expect(result.totalFees).toBe(450);
   });
 });
 

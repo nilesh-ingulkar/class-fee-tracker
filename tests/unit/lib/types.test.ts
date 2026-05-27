@@ -14,6 +14,12 @@ describe("formatCurrency", () => {
     expect(formatCurrency(100, "EUR")).toBe("EUR 100.00");
   });
 
+  it("uses symbol from settings when provided", () => {
+    expect(
+      formatCurrency(100, "EUR", [{ code: "EUR", symbol: "€" }]),
+    ).toBe("€100.00");
+  });
+
   it("includes thousands separators", () => {
     expect(formatCurrency(1234.5, "USD")).toBe("$1,234.50");
   });
@@ -27,5 +33,9 @@ describe("getCurrencySymbol", () => {
 
   it("returns the currency code for unknown currencies", () => {
     expect(getCurrencySymbol("EUR")).toBe("EUR");
+  });
+
+  it("prefers symbol from settings when provided", () => {
+    expect(getCurrencySymbol("EUR", [{ code: "EUR", symbol: "€" }])).toBe("€");
   });
 });

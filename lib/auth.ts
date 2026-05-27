@@ -105,7 +105,31 @@ function isRateLimitedError(error: AuthError): boolean {
     code === "over_email_send_rate_limit" ||
     code === "over_request_rate_limit" ||
     message.includes("rate limit") ||
-    message.includes("too many")
+    message.includes("too many requests")
+  );
+}
+
+function isEmailSendRateLimited(error: AuthError): boolean {
+  const code = getAuthErrorCode(error);
+  const message = getAuthErrorMessage(error);
+  return (
+    code === "over_email_send_rate_limit" ||
+    message.includes("email rate limit")
+  );
+}
+
+function getSignUpRateLimitMessage(error: AuthError): string {
+  if (isEmailSendRateLimited(error)) {
+    return (
+      "Too many verification emails were sent for this address. " +
+      "Check your inbox (and spam), try signing in if you already verified, " +
+      "or wait a few minutes before trying again."
+    );
+  }
+
+  return (
+    "Too many signup attempts. Wait a minute and try again, " +
+    "or sign in if you already created an account."
   );
 }
 
@@ -113,13 +137,26 @@ function hasNoNewIdentity(data: Awaited<ReturnType<SupabaseClient["auth"]["signU
   return Boolean(data.user && data.user.identities?.length === 0);
 }
 
+/** Where users land after clicking the email confirmation link (before sign-in). */
+export const POST_EMAIL_VERIFICATION_PATH = "/login?verified=1";
+
 /**
- * Redirect target embedded in Supabase confirmation / resend emails.
- * Prefer NEXT_PUBLIC_SITE_URL so production emails never point at localhost.
+ * Supabase redirects here with ?code= to verify the account.
+ * The callback route confirms the email, clears any session, then sends users to sign in.
  */
 export function getEmailConfirmationRedirectUrl(requestOrigin?: string): string {
   const origin = resolveSiteUrl(requestOrigin);
-  return `${origin}/auth/callback?next=${encodeURIComponent("/dashboard")}`;
+  return `${origin}/auth/callback?next=${encodeURIComponent(POST_EMAIL_VERIFICATION_PATH)}`;
+}
+
+export function getPostEmailVerificationRedirectPath(
+  path: string | null | undefined,
+): string {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return POST_EMAIL_VERIFICATION_PATH;
+  }
+
+  return path;
 }
 
 export function getSafeRedirectPath(path: string | null | undefined): string {
@@ -165,7 +202,7 @@ export async function signUpWithEmailPassword(
       return {
         ok: false,
         reason: "rate_limited",
-        message: "Please wait a moment before requesting another email.",
+        message: getSignUpRateLimitMessage(error),
       };
     }
 

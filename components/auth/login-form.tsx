@@ -29,6 +29,7 @@ export type LoginFormProps = {
   state: SignInState;
   resendState: ResendVerificationState;
   callbackError: string | null;
+  verifiedMessage?: string | null;
 };
 
 export function LoginForm({
@@ -43,6 +44,7 @@ export function LoginForm({
   state,
   resendState,
   callbackError,
+  verifiedMessage,
 }: LoginFormProps) {
   const isLoading = state.status === "loading";
   const isResending = resendState.status === "loading";
@@ -78,6 +80,13 @@ export function LoginForm({
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-4">
+              {verifiedMessage ? (
+                <Alert>
+                  <AlertTitle>Email verified</AlertTitle>
+                  <AlertDescription>{verifiedMessage}</AlertDescription>
+                </Alert>
+              ) : null}
+
               {callbackError ? (
                 <Alert variant="destructive">
                   <AlertTitle>Sign-in link issue</AlertTitle>

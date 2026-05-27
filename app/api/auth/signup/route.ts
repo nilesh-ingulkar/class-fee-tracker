@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth";
 import type { SignUpApiErrorResponse, SignUpApiSuccessResponse } from "@/lib/auth/signup-api";
 import { isInviteCodeValid } from "@/lib/invite-code";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 const signUpBodySchema = z.object({
   email: z.string().email(),
@@ -18,10 +18,8 @@ const signUpBodySchema = z.object({
 
 /**
  * Server-only signup: validates INVITE_CODE before calling Supabase Auth.
- *
- * INVITE_CODE lives in server environment variables (never NEXT_PUBLIC_*).
- * On Vercel: Project → Settings → Environment Variables → add INVITE_CODE
- * for Production, Preview, and Development as needed, then redeploy.
+ * Uses a cookie-aware Supabase client so PKCE code_verifier is stored in the
+ * browser that submitted signup (required for email confirmation links).
  */
 export async function POST(request: Request) {
   let json: unknown;
@@ -52,12 +50,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // Always build redirect on the server from NEXT_PUBLIC_SITE_URL (not client input).
   const requestOrigin = new URL(request.url).origin;
   const redirectTo = getEmailConfirmationRedirectUrl(requestOrigin);
 
   try {
-    const supabase = await createClient();
+    const response = NextResponse.json<SignUpApiSuccessResponse>({
+      ok: true,
+      message: SIGN_UP_SUCCESS_MESSAGE,
+    });
+    const supabase = await createRouteHandlerClient(response);
     const result = await signUpWithEmailPassword(supabase, {
       email,
       password,
@@ -73,10 +74,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json<SignUpApiSuccessResponse>({
-      ok: true,
-      message: result.message ?? SIGN_UP_SUCCESS_MESSAGE,
-    });
+    return response;
   } catch {
     return NextResponse.json<SignUpApiErrorResponse>(
       { error: "Could not create your account. Try again." },

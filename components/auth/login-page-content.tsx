@@ -12,7 +12,10 @@ import { useResendVerification } from "@/hooks/use-resend-verification";
 import { useSignIn } from "@/hooks/use-sign-in";
 
 const CALLBACK_ERROR =
-  "We could not complete sign-in from your link. Try signing in with email and password, or request a new confirmation email.";
+  "We could not complete sign-in from your link. Open the link in the same browser where you signed up, or sign in with email and password after verifying your email. You can also request a new confirmation email from sign up.";
+
+const VERIFIED_MESSAGE =
+  "Your email is verified. Sign in with your email and password.";
 
 export function LoginPageContent() {
   const router = useRouter();
@@ -25,12 +28,18 @@ export function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [callbackError, setCallbackError] = useState<string | null>(null);
+  const [verifiedMessage, setVerifiedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("error") === "auth_callback") {
       setCallbackError(CALLBACK_ERROR);
+      setVerifiedMessage(null);
+    } else if (searchParams.get("verified") === "1") {
+      setVerifiedMessage(VERIFIED_MESSAGE);
+      setCallbackError(null);
     } else {
       setCallbackError(null);
+      setVerifiedMessage(null);
     }
   }, [searchParams]);
 
@@ -72,6 +81,7 @@ export function LoginPageContent() {
       state={state}
       resendState={resendState}
       callbackError={callbackError}
+      verifiedMessage={verifiedMessage}
     />
   );
 }
